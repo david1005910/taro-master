@@ -12,15 +12,15 @@ interface TarotCardProps {
 }
 
 const sizeClasses = {
-  sm: 'w-20 h-32',
-  md: 'w-32 h-48',
-  lg: 'w-48 h-72'
+  sm: 'w-24 h-40',
+  md: 'w-40 h-60',
+  lg: 'w-56 h-84'
 };
 
 const textSizeClasses = {
-  sm: { number: 'text-lg', name: 'text-[8px]', symbol: 'text-xl', keyword: 'text-[6px]' },
-  md: { number: 'text-2xl', name: 'text-xs', symbol: 'text-3xl', keyword: 'text-[8px]' },
-  lg: { number: 'text-4xl', name: 'text-sm', symbol: 'text-5xl', keyword: 'text-xs' }
+  sm: { number: 'text-xl', name: 'text-[10px]', symbol: 'text-2xl', keyword: 'text-[8px]' },
+  md: { number: 'text-3xl', name: 'text-sm', symbol: 'text-4xl', keyword: 'text-xs' },
+  lg: { number: 'text-5xl', name: 'text-base', symbol: 'text-6xl', keyword: 'text-sm' }
 };
 
 // Suit symbols and colors
@@ -138,7 +138,7 @@ const TarotCard = ({
             {/* Center - Main Symbol */}
             <div className="flex-1 flex items-center justify-center">
               <div className="text-center">
-                <div className={`${size === 'lg' ? 'text-6xl' : size === 'md' ? 'text-4xl' : 'text-2xl'} mb-1`}>
+                <div className={`${size === 'lg' ? 'text-7xl' : size === 'md' ? 'text-5xl' : 'text-3xl'} mb-1`}>
                   {getSymbol()}
                 </div>
                 {size !== 'sm' && (
