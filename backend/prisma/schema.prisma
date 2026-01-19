@@ -1,0 +1,134 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// ============ 사용자 ============
+model User {
+  id           String         @id @default(uuid())
+  email        String         @unique
+  password     String
+  nickname     String         @unique
+  profileImage String?
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
+
+  readings   Reading[]
+  progress   UserProgress[]
+  dailyCards DailyCard[]
+
+  @@map("users")
+}
+
+// ============ 타로 카드 ============
+model Card {
+  id              Int            @id @default(autoincrement())
+  nameKo          String
+  nameEn          String
+  type            String         // MAJOR, MINOR
+  suit            String?        // WANDS, CUPS, SWORDS, PENTACLES
+  number          Int
+  imageUrl        String
+  keywords        String         // JSON array stored as string
+  uprightMeaning  String
+  reversedMeaning String
+  symbolism       String
+  love            String
+  career          String
+  health          String
+  finance         String
+
+  readingCards ReadingCard[]
+  userProgress UserProgress[]
+  dailyCards   DailyCard[]
+
+  @@map("cards")
+}
+
+// ============ 스프레드 ============
+model Spread {
+  id          Int      @id @default(autoincrement())
+  name        String
+  description String
+  cardCount   Int
+  difficulty  Int
+  positions   String   // JSON stored as string
+  imageUrl    String?
+  category    String   @default("general")
+
+  readings Reading[]
+
+  @@map("spreads")
+}
+
+// ============ 리딩 ============
+model Reading {
+  id             String   @id @default(uuid())
+  userId         String
+  spreadId       Int
+  question       String?
+  interpretMode  String   // TRADITIONAL, AI
+  interpretation String?
+  note           String?
+  tags           String   @default("[]") // JSON array stored as string
+  createdAt      DateTime @default(now())
+
+  user   User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  spread Spread        @relation(fields: [spreadId], references: [id])
+  cards  ReadingCard[]
+
+  @@map("readings")
+}
+
+// ============ 리딩 카드 ============
+model ReadingCard {
+  id             String  @id @default(uuid())
+  readingId      String
+  cardId         Int
+  position       Int
+  isReversed     Boolean
+  interpretation String?
+
+  reading Reading @relation(fields: [readingId], references: [id], onDelete: Cascade)
+  card    Card    @relation(fields: [cardId], references: [id])
+
+  @@map("reading_cards")
+}
+
+// ============ 학습 진도 ============
+model UserProgress {
+  id         String   @id @default(uuid())
+  userId     String
+  cardId     Int
+  isLearned  Boolean  @default(false)
+  note       String?
+  isFavorite Boolean  @default(false)
+  updatedAt  DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  card Card @relation(fields: [cardId], references: [id])
+
+  @@unique([userId, cardId])
+  @@map("user_progress")
+}
+
+// ============ 오늘의 카드 ============
+model DailyCard {
+  id         String   @id @default(uuid())
+  userId     String
+  cardId     Int
+  date       DateTime
+  isReversed Boolean
+  message    String?
+  createdAt  DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  card Card @relation(fields: [cardId], references: [id])
+
+  @@unique([userId, date])
+  @@map("daily_cards")
+}

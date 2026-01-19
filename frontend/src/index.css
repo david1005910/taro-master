@@ -1,0 +1,98 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --color-primary: #1a1a2e;
+  --color-secondary: #16213e;
+  --color-accent: #d4af37;
+  --color-background: #0f0f1a;
+  --color-text: #e0e0e0;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  background: linear-gradient(135deg, var(--color-primary) 0%, var(--color-secondary) 50%, var(--color-background) 100%);
+  color: var(--color-text);
+  font-family: 'Noto Sans KR', sans-serif;
+}
+
+#root {
+  min-height: 100vh;
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--color-background);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--color-accent);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #e5c04d;
+}
+
+/* Card styles */
+.card-shadow {
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.3), 0 2px 4px -1px rgba(0, 0, 0, 0.2);
+}
+
+.card-glow {
+  box-shadow: 0 0 15px rgba(212, 175, 55, 0.3);
+}
+
+.card-glow:hover {
+  box-shadow: 0 0 25px rgba(212, 175, 55, 0.5);
+}
+
+/* Glass effect */
+.glass {
+  background: rgba(26, 26, 46, 0.7);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(212, 175, 55, 0.2);
+}
+
+/* Button styles */
+.btn-primary {
+  @apply bg-accent text-primary font-semibold py-2 px-6 rounded-lg transition-all duration-300;
+  @apply hover:bg-yellow-400 hover:shadow-lg hover:shadow-accent/30;
+  @apply active:scale-95;
+}
+
+.btn-secondary {
+  @apply border-2 border-accent text-accent font-semibold py-2 px-6 rounded-lg transition-all duration-300;
+  @apply hover:bg-accent hover:text-primary;
+  @apply active:scale-95;
+}
+
+/* Input styles */
+.input-mystic {
+  @apply w-full px-4 py-3 rounded-lg bg-background/50 border border-mystic-700 text-white;
+  @apply focus:outline-none focus:border-accent focus:ring-1 focus:ring-accent;
+  @apply placeholder-gray-500 transition-all duration-300;
+}
+
+/* Animation utilities */
+.perspective-1000 {
+  perspective: 1000px;
+}
+
+.preserve-3d {
+  transform-style: preserve-3d;
+}
+
+.backface-hidden {
+  backface-visibility: hidden;
+}
+
+.rotate-y-180 {
+  transform: rotateY(180deg);
+}
