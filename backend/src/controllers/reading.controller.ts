@@ -27,43 +27,51 @@ export class ReadingController {
       let cardInterpretations: Array<{ position: number; interpretation: string }> | undefined;
 
       // AI 모드인 경우 AI 해석 요청
+      let actualInterpretMode = validated.interpretMode;
+
       if (validated.interpretMode === 'AI') {
-        const spread = await spreadService.getSpreadById(validated.spreadId);
-        const positions = spread.positions as Array<{ name: string; description: string }>;
+        try {
+          const spread = await spreadService.getSpreadById(validated.spreadId);
+          const positions = spread.positions as Array<{ name: string; description: string }>;
 
-        const cardsWithDetails = await Promise.all(
-          validated.cards.map(async (c) => {
-            const card = await cardService.getCardById(c.cardId);
-            const pos = positions[c.position];
-            return {
-              nameKo: card.nameKo,
-              nameEn: card.nameEn,
-              position: pos.name,
-              positionDescription: pos.description,
-              isReversed: c.isReversed,
-              keywords: card.keywords as string[]
-            };
-          })
-        );
+          const cardsWithDetails = await Promise.all(
+            validated.cards.map(async (c) => {
+              const card = await cardService.getCardById(c.cardId);
+              const pos = positions[c.position];
+              return {
+                nameKo: card.nameKo,
+                nameEn: card.nameEn,
+                position: pos.name,
+                positionDescription: pos.description,
+                isReversed: c.isReversed,
+                keywords: card.keywords as string[]
+              };
+            })
+          );
 
-        const aiResult = await aiService.interpret({
-          spreadType: spread.name,
-          question: validated.question,
-          cards: cardsWithDetails
-        });
+          const aiResult = await aiService.interpret({
+            spreadType: spread.name,
+            question: validated.question,
+            cards: cardsWithDetails
+          });
 
-        interpretation = aiResult.overallInterpretation + '\n\n' + aiResult.advice;
-        cardInterpretations = aiResult.cardInterpretations.map((ci, idx) => ({
-          position: idx,
-          interpretation: ci.interpretation
-        }));
+          interpretation = aiResult.overallInterpretation + '\n\n' + aiResult.advice;
+          cardInterpretations = aiResult.cardInterpretations.map((ci, idx) => ({
+            position: idx,
+            interpretation: ci.interpretation
+          }));
+        } catch (aiError: any) {
+          console.error('[Reading] AI interpretation failed, falling back to traditional mode:', aiError.message || aiError);
+          // AI 해석 실패 시 전통 모드로 폴백
+          actualInterpretMode = 'TRADITIONAL';
+        }
       }
 
       const result = await readingService.createReading({
         userId,
         spreadId: validated.spreadId,
         question: validated.question,
-        interpretMode: validated.interpretMode,
+        interpretMode: actualInterpretMode,
         cards: validated.cards,
         interpretation,
         cardInterpretations
