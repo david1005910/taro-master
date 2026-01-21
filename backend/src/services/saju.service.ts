@@ -554,40 +554,83 @@ export class SajuService {
     interpretation += `⚠️ 살짝 주의할 점: ${stemDetail.weaknesses.join(', ')}\n`;
     interpretation += `   (완벽한 사람은 없잖아요~ 괜찮아요! 💪)\n\n`;
 
-    // 3. 띠 분석
+    // 3. 띠 분석 - 더 재미있게!
     const zodiacDetail = zodiacDetails[zodiac];
-    interpretation += `【 ${zodiac}띠 분석 】\n\n`;
+    const zodiacEmojis: Record<string, string> = {
+      '쥐': '🐭', '소': '🐂', '호랑이': '🐯', '토끼': '🐰',
+      '용': '🐲', '뱀': '🐍', '말': '🐴', '양': '🐑',
+      '원숭이': '🐵', '닭': '🐔', '개': '🐕', '돼지': '🐷'
+    };
+    interpretation += `【 ${zodiacEmojis[zodiac]} ${zodiac}띠 분석 - 띠로 보는 나! 】\n\n`;
+    interpretation += `💡 띠가 뭐냐고요?\n`;
+    interpretation += `   태어난 해의 동물로, 기본 성향을 보여줘요!\n`;
+    interpretation += `   중국집 테이블에서 자주 보셨죠? 그거예요! 🥡\n\n`;
+    interpretation += `🎯 ${zodiac}띠의 매력 포인트:\n`;
     interpretation += `${zodiacDetail.traits}\n\n`;
-    interpretation += `💑 궁합이 좋은 띠: ${zodiacDetail.compatible}\n`;
-    interpretation += `⚡ 주의가 필요한 띠: ${zodiacDetail.incompatible}\n\n`;
+    const zodiacFunFact: Record<string, string> = {
+      '쥐': '💡 쥐띠는 영리해서 친구들 사이에서 "브레인" 역할을 해요!',
+      '소': '💡 소띠는 믿음직해서 "이 사람한테 맡기면 안심" 이라는 말 자주 들어요!',
+      '호랑이': '💡 호랑이띠는 카리스마 때문에 자연스럽게 리더가 되는 경우가 많아요!',
+      '토끼': '💡 토끼띠는 분위기 메이커! 있으면 화기애애해져요!',
+      '용': '💡 용띠는 동양에서 최고로 치는 띠예요! 부모님이 용띠 낳으려고 노력하셨을지도...? 😅',
+      '뱀': '💡 뱀띠는 직관이 뛰어나서 "어떻게 알았어?!" 소리 자주 들어요!',
+      '말': '💡 말띠는 에너지 넘쳐서 가만히 있으면 병 나는 스타일!',
+      '양': '💡 양띠는 예술적 감각이 있어서 패션이나 인테리어 센스 좋아요!',
+      '원숭이': '💡 원숭이띠는 재치 있어서 말빨로 위기를 넘기는 달인!',
+      '닭': '💡 닭띠는 정확해서 약속 시간에 딱! 맞춰 오는 스타일!',
+      '개': '💡 개띠는 의리 넘쳐서 친구 욕하면 당장 달려가는 스타일!',
+      '돼지': '💡 돼지띠는 복 많은 띠! 먹복, 재물복 다 있어요!'
+    };
+    interpretation += `${zodiacFunFact[zodiac]}\n\n`;
+    interpretation += `💑 찰떡궁합 띠: ${zodiacDetail.compatible}\n`;
+    interpretation += `   (이 띠들이랑은 왠지 잘 통해요!)\n\n`;
+    interpretation += `⚡ 케미 조심 띠: ${zodiacDetail.incompatible}\n`;
+    interpretation += `   (싸우면 안 돼요~ 서로 이해하면 괜찮아요!)\n\n`;
 
-    // 4. 오행 분석
-    interpretation += `【 오행(五行) 분석 】\n\n`;
-    interpretation += `📊 오행 분포\n`;
+    // 4. 오행 분석 - 더 재미있게!
+    interpretation += `【 🌈 오행(五行) 분석 - 나만의 에너지 밸런스! 】\n\n`;
+    interpretation += `💡 오행이 뭐냐고요?\n`;
+    interpretation += `   목(나무)🌳, 화(불)🔥, 토(흙)🏔️, 금(쇠)⚪, 수(물)💧\n`;
+    interpretation += `   이 5가지 에너지가 당신 안에 어떻게 분포되어 있는지 보는 거예요!\n`;
+    interpretation += `   마치 게임 캐릭터 스탯 같은 느낌? 🎮\n\n`;
+    interpretation += `📊 당신의 오행 스탯 그래프:\n`;
+    const elementEmojis: Record<string, string> = { '목': '🌳', '화': '🔥', '토': '🏔️', '금': '⚪', '수': '💧' };
     elements.forEach(el => {
       const bar = '█'.repeat(el.count) + '░'.repeat(Math.max(0, 5 - el.count));
       const percent = total > 0 ? Math.round((el.count / total) * 100) : 0;
-      interpretation += `   ${el.name}: ${bar} ${el.count}개 (${percent}%)\n`;
+      interpretation += `   ${elementEmojis[el.name]} ${el.name}: ${bar} ${el.count}개 (${percent}%)\n`;
     });
     interpretation += `\n`;
 
-    // 가장 강한 오행
-    interpretation += `🔥 가장 강한 오행: ${strongest.name}(木火土金水 중)\n`;
+    // 가장 강한 오행 - 더 재미있게!
+    interpretation += `🏆 당신의 주력 에너지: ${elementEmojis[strongest.name]} ${strongest.name}!\n`;
     const strongDetail = elementDetails[strongest.name];
-    interpretation += `${strongDetail.nature}\n\n`;
+    interpretation += `   ${strongDetail.nature}\n\n`;
+    const strongElementFun: Record<string, string> = {
+      '목': '🌱 목 에너지 강한 당신! 성장과 발전이 DNA에 새겨진 사람이에요.\n   새로운 걸 시작하면 어느새 전문가가 되어있는 타입!',
+      '화': '🔥 화 에너지 강한 당신! 열정이 넘쳐서 주변을 들썩이게 해요.\n   파티에서 혼자 신나면 다 같이 신나는 분위기 메이커!',
+      '토': '🏔️ 토 에너지 강한 당신! 듬직해서 모두가 기대는 사람이에요.\n   "너한테 말하면 마음이 편해져~" 자주 들으시죠?',
+      '금': '⚔️ 금 에너지 강한 당신! 칼 같은 판단력의 소유자예요.\n   결정 장애 친구들이 당신한테 자주 물어보죠?',
+      '수': '🌊 수 에너지 강한 당신! 지혜롭고 직관력이 뛰어나요.\n   "어떻게 알았어?" 소리 많이 들으시죠?'
+    };
+    interpretation += `${strongElementFun[strongest.name]}\n\n`;
 
-    // 부족한 오행
+    // 부족한 오행 - 더 친절하게!
     if (weakest.length > 0) {
-      interpretation += `💧 부족한 오행: ${weakest.map(e => e.name).join(', ')}\n`;
+      interpretation += `🔋 충전이 필요한 에너지: ${weakest.map(e => elementEmojis[e.name] + e.name).join(', ')}\n`;
+      interpretation += `   (걱정 마세요! 보완하는 방법이 있어요! 💪)\n`;
       weakest.forEach(el => {
         const weakDetail = elementDetails[el.name];
-        interpretation += `\n[${el.name} 보완 방법]\n`;
-        interpretation += `• 색상 활용: ${weakDetail.colors}\n`;
-        interpretation += `• 방향 활용: ${weakDetail.directions}쪽 방향\n`;
-        interpretation += `• 음식 섭취: ${weakDetail.foods}\n`;
-        interpretation += `• ${weakDetail.strengthTips}\n`;
+        interpretation += `\n✨ [${elementEmojis[el.name]} ${el.name} 에너지 충전법!]\n`;
+        interpretation += `   🎨 행운의 색상: ${weakDetail.colors}\n`;
+        interpretation += `   🧭 좋은 방향: ${weakDetail.directions}쪽\n`;
+        interpretation += `   🍽️ 추천 음식: ${weakDetail.foods}\n`;
+        interpretation += `   💡 꿀팁: ${weakDetail.strengthTips}\n`;
       });
       interpretation += `\n`;
+    } else {
+      interpretation += `🌟 와! 오행이 꽤 균형 잡혀 있네요!\n`;
+      interpretation += `   타고나길 잘 타고나신 편이에요! 부러워요~ 😄\n\n`;
     }
 
     // ========== 운세별 상세 분석 데이터 ==========
@@ -818,56 +861,94 @@ export class SajuService {
 
     // ========== 해석 계속 ==========
 
-    // 5. 연애운 (Love Fortune)
+    // 5. 연애운 (Love Fortune) - 더 재미있게!
     const loveElement = strongest.name;
     const loveFortune = fortuneByElement[loveElement].love;
-    interpretation += `【 💕 연애운 분석 】\n\n`;
-    interpretation += `[현재 연애 기운: ${loveElement}의 영향]\n\n`;
-    interpretation += `✨ 좋은 점\n${loveFortune.good}\n\n`;
-    interpretation += `⚠️ 주의할 점\n${loveFortune.caution}\n\n`;
-    interpretation += `💡 조언\n${loveFortune.tip}\n\n`;
-    interpretation += `${stemDetail.relationship}\n\n`;
+    interpretation += `【 💕 연애운 분석 - 두근두근 러브 스토리! 】\n\n`;
+    interpretation += `자, 이제 제일 궁금하신 연애 얘기 해볼까요? 😏\n\n`;
+    interpretation += `💘 당신의 연애 스타일:\n`;
+    interpretation += `   ${elementEmojis[loveElement]} ${loveElement} 에너지가 강해서...\n`;
+    const loveStyleFun: Record<string, string> = {
+      '목': '🌱 성장하는 연애를 해요! "우리 함께 발전하자!" 스타일',
+      '화': '🔥 열정적인 연애! "널 위해서라면 뭐든지!" 스타일',
+      '토': '🏔️ 안정적인 연애! "우리 오래오래 함께하자" 스타일',
+      '금': '💎 품격있는 연애! "퀄리티 있는 데이트" 스타일',
+      '수': '🌊 깊은 연애! "네 마음 깊숙이 들어갈래" 스타일'
+    };
+    interpretation += `   ${loveStyleFun[loveElement]}\n\n`;
+    interpretation += `✨ 연애 잘 될 때:\n${loveFortune.good}\n\n`;
+    interpretation += `😅 이런 건 조심!:\n${loveFortune.caution}\n\n`;
+    interpretation += `💡 연애 꿀팁:\n${loveFortune.tip}\n\n`;
+    interpretation += `📝 TMI 연애 조언:\n${stemDetail.relationship}\n\n`;
 
-    // 6. 출세운 (Career Fortune)
+    // 6. 출세운 (Career Fortune) - 더 재미있게!
     const careerFortune = fortuneByElement[strongest.name].career;
-    interpretation += `【 🏆 출세운 분석 】\n\n`;
-    interpretation += `[현재 사업/직장 기운: ${strongest.name}의 영향]\n\n`;
-    interpretation += `✨ 좋은 점\n${careerFortune.good}\n\n`;
-    interpretation += `⚠️ 주의할 점\n${careerFortune.caution}\n\n`;
-    interpretation += `💡 조언\n${careerFortune.tip}\n\n`;
-    interpretation += `${stemDetail.career}\n\n`;
-    interpretation += `[오행별 적합 분야]\n`;
-    if (elementCount.woodCount >= 2) interpretation += `• 목(木): 교육, 출판, 의류, 목재, 농업, 환경, 스타트업\n`;
-    if (elementCount.fireCount >= 2) interpretation += `• 화(火): IT, 에너지, 엔터테인먼트, 마케팅, 요식업\n`;
-    if (elementCount.earthCount >= 2) interpretation += `• 토(土): 부동산, 건설, 농업, 창고, 중개업\n`;
-    if (elementCount.metalCount >= 2) interpretation += `• 금(金): 금융, 법률, 제조업, 자동차, 보석, 의료기기\n`;
-    if (elementCount.waterCount >= 2) interpretation += `• 수(水): 물류, 무역, 관광, 미디어, 연구, 해운\n`;
+    interpretation += `【 🏆 출세운 분석 - 성공을 향해! 】\n\n`;
+    interpretation += `💼 "월급 통장이 두둑해지는 비결은?"\n\n`;
+    interpretation += `🎯 당신의 직장/사업 스타일:\n`;
+    interpretation += `   ${elementEmojis[strongest.name]} ${strongest.name} 에너지 덕분에...\n`;
+    const careerStyleFun: Record<string, string> = {
+      '목': '🌱 새로운 걸 개척하는 스타일! 스타트업 창업자 느낌!',
+      '화': '🔥 주목받는 위치에서 빛나는 스타일! 발표왕!',
+      '토': '🏔️ 묵묵히 쌓아가는 스타일! "꾸준함이 진리"',
+      '금': '💎 전문성으로 승부하는 스타일! 스페셜리스트!',
+      '수': '🌊 통찰력으로 기회 잡는 스타일! 전략가!'
+    };
+    interpretation += `   ${careerStyleFun[strongest.name]}\n\n`;
+    interpretation += `✨ 잘 될 때:\n${careerFortune.good}\n\n`;
+    interpretation += `😅 조심할 것:\n${careerFortune.caution}\n\n`;
+    interpretation += `💡 출세 꿀팁:\n${careerFortune.tip}\n\n`;
+    interpretation += `📝 TMI 직업 조언:\n${stemDetail.career}\n\n`;
+    interpretation += `🎯 오행별 찰떡 직업 (2개 이상 있는 오행 기준):\n`;
+    if (elementCount.woodCount >= 2) interpretation += `   🌳 목: 교육, 출판, 의류, 농업, 환경, 스타트업 (새로 시작하는 분야!)\n`;
+    if (elementCount.fireCount >= 2) interpretation += `   🔥 화: IT, 에너지, 엔터테인먼트, 마케팅, 요식업 (빛나는 분야!)\n`;
+    if (elementCount.earthCount >= 2) interpretation += `   🏔️ 토: 부동산, 건설, 농업, 창고, 중개업 (안정적인 분야!)\n`;
+    if (elementCount.metalCount >= 2) interpretation += `   ⚪ 금: 금융, 법률, 제조업, 자동차, 보석 (날카로운 분야!)\n`;
+    if (elementCount.waterCount >= 2) interpretation += `   💧 수: 물류, 무역, 관광, 미디어, 연구 (유동적인 분야!)\n`;
     interpretation += `\n`;
 
-    // 7. 금전운 (Financial Fortune)
+    // 7. 금전운 (Financial Fortune) - 더 재미있게!
     const moneyFortune = fortuneByElement[strongest.name].money;
-    interpretation += `【 💰 금전운 분석 】\n\n`;
-    interpretation += `[현재 재물 기운: ${strongest.name}의 영향]\n\n`;
-    interpretation += `✨ 좋은 점\n${moneyFortune.good}\n\n`;
-    interpretation += `⚠️ 주의할 점\n${moneyFortune.caution}\n\n`;
-    interpretation += `💡 재테크 조언\n${moneyFortune.tip}\n\n`;
+    interpretation += `【 💰 금전운 분석 - 돈 많이 버는 비결! 】\n\n`;
+    interpretation += `🤑 "통장 잔고가 궁금해요!"\n\n`;
+    interpretation += `💵 당신의 돈 스타일:\n`;
+    const moneyStyleFun: Record<string, string> = {
+      '목': '🌱 투자해서 키우는 타입! "씨앗을 심으면 나무가 되지~"',
+      '화': '🔥 확 쓰고 확 버는 타입! "인생은 한 방!"',
+      '토': '🏔️ 차곡차곡 모으는 타입! "티끌 모아 태산!"',
+      '금': '💎 정확한 판단으로 투자하는 타입! "데이터 분석 완료!"',
+      '수': '🌊 흘러들어오는 타입! "돈이 저절로 와요~"'
+    };
+    interpretation += `   ${moneyStyleFun[strongest.name]}\n\n`;
+    interpretation += `✨ 돈 잘 벌 때:\n${moneyFortune.good}\n\n`;
+    interpretation += `😱 이건 조심!:\n${moneyFortune.caution}\n\n`;
+    interpretation += `💡 재테크 꿀팁:\n${moneyFortune.tip}\n\n`;
 
-    // 8. 건강운 (Health Fortune)
+    // 8. 건강운 (Health Fortune) - 더 친절하게!
     const healthFortune = fortuneByElement[strongest.name].health;
-    interpretation += `【 🏥 건강운 분석 】\n\n`;
-    interpretation += `[현재 건강 기운: ${strongest.name}의 영향]\n\n`;
-    interpretation += `✨ 좋은 점\n${healthFortune.good}\n\n`;
-    interpretation += `⚠️ 주의할 점\n${healthFortune.caution}\n\n`;
-    interpretation += `💡 건강 관리 조언\n${healthFortune.tip}\n\n`;
+    interpretation += `【 🏥 건강운 분석 - 100세까지 건강하게! 】\n\n`;
+    interpretation += `🏃 "건강해야 돈도 벌고 연애도 하죠!"\n\n`;
+    interpretation += `💪 당신의 건강 스타일:\n`;
+    const healthStyleFun: Record<string, string> = {
+      '목': '🌱 성장 에너지! 운동 시작하면 빠르게 몸 좋아지는 타입!',
+      '화': '🔥 열정 에너지! 활동량 많아서 칼로리 소모 잘 되는 타입!',
+      '토': '🏔️ 안정 에너지! 체력이 꾸준해서 쉽게 지치지 않는 타입!',
+      '금': '💎 강철 에너지! 회복력 좋고 면역력 강한 타입!',
+      '수': '🌊 유연 에너지! 적응력 좋고 스트레스 해소 잘 하는 타입!'
+    };
+    interpretation += `   ${healthStyleFun[strongest.name]}\n\n`;
+    interpretation += `✨ 건강 좋을 때:\n${healthFortune.good}\n\n`;
+    interpretation += `😷 여기 조심!:\n${healthFortune.caution}\n\n`;
+    interpretation += `💊 건강 꿀팁:\n${healthFortune.tip}\n\n`;
     const strongElHealth = elementDetails[strongest.name];
-    interpretation += `[강한 ${strongest.name} 오행으로 인한 주의 부위]\n`;
-    interpretation += `${strongElHealth.bodyParts}\n`;
-    interpretation += `${strongElHealth.emotions}\n\n`;
+    interpretation += `🔍 ${strongest.name} 에너지가 강해서 신경 쓸 부위:\n`;
+    interpretation += `   ${strongElHealth.bodyParts}\n`;
+    interpretation += `   ${strongElHealth.emotions}\n\n`;
     if (weakest.length > 0) {
-      interpretation += `[부족한 오행으로 인한 보강 필요 부위]\n`;
+      interpretation += `💉 부족한 에너지로 보강 필요한 부위:\n`;
       weakest.forEach(el => {
         const weakElHealth = elementDetails[el.name];
-        interpretation += `• ${el.name} 부족: ${weakElHealth.bodyParts} 관리 필요\n`;
+        interpretation += `   • ${elementEmojis[el.name]} ${el.name} 부족 → ${weakElHealth.bodyParts} 관리해주세요!\n`;
       });
       interpretation += `\n`;
     }
@@ -877,52 +958,71 @@ export class SajuService {
     interpretation += heavenlyFortune;
     interpretation += `\n`;
 
-    // 10. 2026년 운세
-    interpretation += `【 🐍 2026년 병오(丙午)년 운세 】\n\n`;
+    // 10. 2026년 운세 - 더 재미있게!
+    interpretation += `【 🐴 2026년 병오(丙午)년 운세 - 새해 복 많이! 】\n\n`;
+    interpretation += `🎊 2026년은 병오(丙午)년!\n`;
+    interpretation += `   말(🐴)의 해에 불(🔥) 에너지가 강한 해예요.\n`;
+    interpretation += `   자, 당신의 2026년은 어떨지 볼까요?\n\n`;
     const yearlyFortune = this.analyze2026Fortune(fourPillars, elementCount, dayStem);
     interpretation += yearlyFortune;
     interpretation += `\n`;
 
-    // 11. 10년 대운
+    // 11. 10년 대운 - 더 친근하게!
     const decadeList = decadeFortunes[dayStem] || decadeFortunes['갑'];
-    interpretation += `【 📅 10년 대운 (나이별 운세) 】\n\n`;
+    interpretation += `【 📅 인생 로드맵 - 나이별 운세 】\n\n`;
+    interpretation += `🗺️ "인생은 여행! 각 시기마다 다른 풍경이 펼쳐져요!"\n\n`;
     decadeList.forEach((decade, idx) => {
-      const emoji = ['👶', '🧒', '👨', '👨‍💼', '👨‍🦳', '👴', '🧓', '👼'][idx] || '✨';
+      const emoji = ['👶', '🧒', '🧑', '👨‍💼', '🧔', '👨‍🦳', '🧓', '😇'][idx] || '✨';
       interpretation += `${emoji} ${decade.title}\n`;
-      interpretation += `   ${decade.description}\n\n`;
+      interpretation += `   → ${decade.description}\n\n`;
     });
+    interpretation += `💡 TIP: 각 시기에 맞는 준비를 하면 인생이 더 순탄해요!\n\n`;
 
-    // 11. 용신 및 개운법
-    interpretation += `【 🍀 개운(開運) 조언 】\n\n`;
-    interpretation += `🎯 도움이 되는 오행(용신): ${helpingElement}\n`;
+    // 12. 용신 및 개운법 - 더 실용적으로!
+    interpretation += `【 🍀 개운(開運) 비법 - 행운을 부르는 방법! 】\n\n`;
+    interpretation += `🎯 당신에게 도움 되는 에너지(용신): ${elementEmojis[helpingElement]} ${helpingElement}!\n\n`;
+    interpretation += `"어떻게 하면 운이 좋아질까요?" 🤔\n`;
+    interpretation += `바로 이 ${helpingElement} 에너지를 보강하면 돼요!\n\n`;
     const helpDetail = elementDetails[helpingElement];
-    interpretation += `\n[${helpingElement} 기운 보강 방법]\n`;
-    interpretation += `• 행운의 색상: ${helpDetail.colors}\n`;
-    interpretation += `• 좋은 방향: ${helpDetail.directions}\n`;
-    interpretation += `• 좋은 계절: ${helpDetail.seasons}\n`;
-    interpretation += `• 권장 음식: ${helpDetail.foods}\n`;
-    interpretation += `• ${helpDetail.strengthTips}\n\n`;
+    interpretation += `✨ ${helpingElement} 에너지 충전 꿀팁:\n\n`;
+    interpretation += `   🎨 행운의 색상: ${helpDetail.colors}\n`;
+    interpretation += `      (옷이나 소품으로 활용해보세요!)\n\n`;
+    interpretation += `   🧭 좋은 방향: ${helpDetail.directions}\n`;
+    interpretation += `      (책상, 침대 방향 참고하세요!)\n\n`;
+    interpretation += `   📅 좋은 계절: ${helpDetail.seasons}\n`;
+    interpretation += `      (이 계절에 중요한 일 계획하세요!)\n\n`;
+    interpretation += `   🍽️ 추천 음식: ${helpDetail.foods}\n`;
+    interpretation += `      (자주 드시면 좋아요!)\n\n`;
+    interpretation += `   💡 특별 꿀팁: ${helpDetail.strengthTips}\n\n`;
 
     if (weakest.length > 0) {
-      interpretation += `[부족한 오행 보완법]\n`;
+      interpretation += `📦 부족한 에너지 채우는 법:\n`;
       weakest.forEach(el => {
         const weakDetail = elementDetails[el.name];
-        interpretation += `\n▸ ${el.name} 보완\n`;
-        interpretation += `  색상: ${weakDetail.colors}\n`;
-        interpretation += `  방향: ${weakDetail.directions}\n`;
-        interpretation += `  음식: ${weakDetail.foods}\n`;
+        interpretation += `\n   ${elementEmojis[el.name]} ${el.name} 충전하려면:\n`;
+        interpretation += `      • 색상: ${weakDetail.colors} 활용\n`;
+        interpretation += `      • 방향: ${weakDetail.directions}쪽 활용\n`;
+        interpretation += `      • 음식: ${weakDetail.foods} 섭취\n`;
       });
       interpretation += `\n`;
     }
 
-    // 12. 마무리
-    interpretation += `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n`;
-    interpretation += `💫 사주팔자는 타고난 기질과 잠재력을 보여주는 것이지,\n`;
-    interpretation += `   운명을 결정짓는 것이 아닙니다.\n\n`;
-    interpretation += `   자신의 강점을 살리고 약점을 보완하며,\n`;
-    interpretation += `   운의 흐름을 지혜롭게 활용하여\n`;
-    interpretation += `   더 나은 삶을 만들어 가시기 바랍니다.\n\n`;
-    interpretation += `   "운명은 성격 속에 있다" - 노자 💫\n`;
+    // 12. 마무리 - 더 따뜻하게!
+    interpretation += `🎊✨━━━━━━━━━━━━━━━━━━━━━━━━━━━━━✨🎊\n\n`;
+    interpretation += `      📝 마무리 한마디\n\n`;
+    interpretation += `🎊✨━━━━━━━━━━━━━━━━━━━━━━━━━━━━━✨🎊\n\n`;
+    interpretation += `💝 여기까지 읽어주셨어요? 감사해요! 🙏\n\n`;
+    interpretation += `사주팔자는 "당신의 가능성"을 보여주는 거예요.\n`;
+    interpretation += `"이렇게 살아야 해!"가 아니라\n`;
+    interpretation += `"이런 장점이 있으니까 이렇게 하면 좋겠다~" 정도예요. 😊\n\n`;
+    interpretation += `운명은 정해진 게 아니에요!\n`;
+    interpretation += `오늘의 선택이 내일의 운명을 만들어요. 💪\n\n`;
+    interpretation += `강점은 더 키우고, 약점은 보완하면서\n`;
+    interpretation += `당신만의 멋진 인생을 만들어 가세요! 🌟\n\n`;
+    interpretation += `응원할게요! 화이팅! 🎉🎉🎉\n\n`;
+    interpretation += `\n`;
+    interpretation += `   "운명은 용기 있는 자에게 미소 짓는다" 💫\n`;
+    interpretation += `                           - 고대 로마 속담 -\n`;
 
     return interpretation;
   }
