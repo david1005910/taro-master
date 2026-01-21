@@ -246,7 +246,7 @@ const SajuHistory = () => {
 
   if (loading && readings.length === 0) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-[#0f0f1a] via-[#1a1a2e] to-[#16213e] flex items-center justify-center relative overflow-hidden">
+      <div className="min-h-screen bg-gradient-to-br from-[#2a2a45] via-[#3d3d5c] to-[#4a5a7a] flex items-center justify-center relative overflow-hidden">
         <GooeyFilter />
         <AnimatedBlobs />
         <motion.div
@@ -265,7 +265,7 @@ const SajuHistory = () => {
               animate={{ rotate: -360 }}
               transition={{ duration: 3, repeat: Infinity, ease: "linear" }}
             />
-            <motion.div className="absolute inset-4 rounded-full bg-[#1a1a2e]" />
+            <motion.div className="absolute inset-4 rounded-full bg-[#3d3d5c]" />
           </div>
           <motion.p
             className="text-white/60 text-lg"
@@ -280,7 +280,7 @@ const SajuHistory = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-[#0f0f1a] via-[#1a1a2e] to-[#16213e] py-12 px-4 relative overflow-hidden">
+    <div className="min-h-screen bg-gradient-to-br from-[#2a2a45] via-[#3d3d5c] to-[#4a5a7a] py-12 px-4 relative overflow-hidden">
       <GooeyFilter />
       <AnimatedBlobs />
 

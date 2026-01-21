@@ -3,11 +3,11 @@
 @tailwind utilities;
 
 :root {
-  --color-primary: #1a1a2e;
-  --color-secondary: #16213e;
+  --color-primary: #3d3d5c;
+  --color-secondary: #4a5a7a;
   --color-accent: #d4af37;
-  --color-background: #0f0f1a;
-  --color-text: #e0e0e0;
+  --color-background: #2a2a45;
+  --color-text: #f0f0f5;
 }
 
 body {
@@ -55,7 +55,7 @@ body {
 
 /* Glass effect */
 .glass {
-  background: rgba(26, 26, 46, 0.7);
+  background: rgba(61, 61, 92, 0.7);
   backdrop-filter: blur(10px);
   border: 1px solid rgba(212, 175, 55, 0.2);
 }
@@ -249,11 +249,11 @@ body {
 .bg-gradient-liquid {
   background: linear-gradient(
     135deg,
-    #0f0f1a 0%,
-    #1a1a2e 25%,
-    #16213e 50%,
-    #1a1a2e 75%,
-    #0f0f1a 100%
+    #2a2a45 0%,
+    #3d3d5c 25%,
+    #4a5a7a 50%,
+    #3d3d5c 75%,
+    #2a2a45 100%
   );
   background-size: 400% 400%;
   animation: gradient-shift 15s ease infinite;

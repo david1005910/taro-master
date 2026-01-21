@@ -230,7 +230,7 @@ const SajuResult = () => {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-[#0f0f1a] via-[#1a1a2e] to-[#16213e] flex items-center justify-center relative overflow-hidden">
+      <div className="min-h-screen bg-gradient-to-br from-[#2a2a45] via-[#3d3d5c] to-[#4a5a7a] flex items-center justify-center relative overflow-hidden">
         <GooeyFilter />
         <AnimatedBlobs />
         <motion.div
@@ -251,7 +251,7 @@ const SajuResult = () => {
               transition={{ duration: 3, repeat: Infinity, ease: "linear" }}
             />
             <motion.div
-              className="absolute inset-4 rounded-full bg-[#1a1a2e]"
+              className="absolute inset-4 rounded-full bg-[#3d3d5c]"
             />
           </div>
           <motion.p
@@ -268,7 +268,7 @@ const SajuResult = () => {
 
   if (error || !reading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-[#0f0f1a] via-[#1a1a2e] to-[#16213e] flex items-center justify-center relative overflow-hidden">
+      <div className="min-h-screen bg-gradient-to-br from-[#2a2a45] via-[#3d3d5c] to-[#4a5a7a] flex items-center justify-center relative overflow-hidden">
         <GooeyFilter />
         <AnimatedBlobs />
         <GlassCard className="p-8 text-center max-w-md mx-4">
@@ -285,7 +285,7 @@ const SajuResult = () => {
   const { fourPillarsDisplay, elementAnalysis, zodiacAnimal, interpretation } = reading;
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-[#0f0f1a] via-[#1a1a2e] to-[#16213e] py-12 px-4 relative overflow-hidden">
+    <div className="min-h-screen bg-gradient-to-br from-[#2a2a45] via-[#3d3d5c] to-[#4a5a7a] py-12 px-4 relative overflow-hidden">
       <GooeyFilter />
       <AnimatedBlobs />
 

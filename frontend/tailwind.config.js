@@ -10,10 +10,10 @@ export default {
         '44': '11rem',
       },
       colors: {
-        primary: '#1a1a2e',
-        secondary: '#16213e',
+        primary: '#3d3d5c',
+        secondary: '#4a5a7a',
         accent: '#d4af37',
-        background: '#0f0f1a',
+        background: '#2a2a45',
         mystic: {
           50: '#f5f3ff',
           100: '#ede9fe',
@@ -22,9 +22,9 @@ export default {
           400: '#a78bfa',
           500: '#8b5cf6',
           600: '#7c3aed',
-          700: '#6d28d9',
-          800: '#5b21b6',
-          900: '#1a1a2e'
+          700: '#5d4a8a',
+          800: '#4a3a70',
+          900: '#3d3d5c'
         }
       },
       fontFamily: {
@@ -65,7 +65,7 @@ export default {
         }
       },
       backgroundImage: {
-        'gradient-mystic': 'linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f0f1a 100%)',
+        'gradient-mystic': 'linear-gradient(135deg, #3d3d5c 0%, #4a5a7a 50%, #2a2a45 100%)',
         'gradient-gold': 'linear-gradient(135deg, #d4af37 0%, #f5d061 50%, #d4af37 100%)',
       }
     },

@@ -740,7 +740,7 @@ function createSimpleMajorCard(number: number, symbol: string, bgColor: string, 
       <defs>
         <linearGradient id={`grad${number}`} x1="0%" y1="0%" x2="0%" y2="100%">
           <stop offset="0%" stopColor={bgColor} />
-          <stop offset="100%" stopColor="#1a1a2e" />
+          <stop offset="100%" stopColor="#3d3d5c" />
         </linearGradient>
         <filter id={`glow${number}`}>
           <feGaussianBlur stdDeviation="3" result="coloredBlur"/>
@@ -793,7 +793,7 @@ const MinorArcanaIllustration = ({
       <defs>
         <linearGradient id={`minorGrad${suit}`} x1="0%" y1="0%" x2="0%" y2="100%">
           <stop offset="0%" stopColor={config?.color || '#666'} stopOpacity="0.3" />
-          <stop offset="100%" stopColor="#1a1a2e" />
+          <stop offset="100%" stopColor="#3d3d5c" />
         </linearGradient>
       </defs>
       <rect fill={`url(#minorGrad${suit})`} width="200" height="260"/>
