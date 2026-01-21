@@ -28,10 +28,19 @@ const Header = () => {
             <Link to="/cards" className="text-gray-300 hover:text-accent transition-colors">
               카드 백과
             </Link>
+            <Link to="/tarot/learn" className="text-gray-300 hover:text-accent transition-colors">
+              타로학습
+            </Link>
             {isAuthenticated && (
               <>
                 <Link to="/reading" className="text-gray-300 hover:text-accent transition-colors">
                   리딩 시작
+                </Link>
+                <Link to="/saju" className="text-gray-300 hover:text-accent transition-colors">
+                  사주
+                </Link>
+                <Link to="/saju/learn" className="text-gray-300 hover:text-accent transition-colors">
+                  사주학습
                 </Link>
                 <Link to="/daily" className="text-gray-300 hover:text-accent transition-colors">
                   오늘의 카드
@@ -92,6 +101,13 @@ const Header = () => {
               >
                 카드 백과
               </Link>
+              <Link
+                to="/tarot/learn"
+                className="text-gray-300 hover:text-accent transition-colors"
+                onClick={() => setIsMenuOpen(false)}
+              >
+                타로학습
+              </Link>
               {isAuthenticated ? (
                 <>
                   <Link
@@ -100,6 +116,20 @@ const Header = () => {
                     onClick={() => setIsMenuOpen(false)}
                   >
                     리딩 시작
+                  </Link>
+                  <Link
+                    to="/saju"
+                    className="text-gray-300 hover:text-accent transition-colors"
+                    onClick={() => setIsMenuOpen(false)}
+                  >
+                    사주
+                  </Link>
+                  <Link
+                    to="/saju/learn"
+                    className="text-gray-300 hover:text-accent transition-colors"
+                    onClick={() => setIsMenuOpen(false)}
+                  >
+                    사주학습
                   </Link>
                   <Link
                     to="/daily"

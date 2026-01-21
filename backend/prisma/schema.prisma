@@ -17,9 +17,10 @@ model User {
   createdAt    DateTime       @default(now())
   updatedAt    DateTime       @updatedAt
 
-  readings   Reading[]
-  progress   UserProgress[]
-  dailyCards DailyCard[]
+  readings     Reading[]
+  progress     UserProgress[]
+  dailyCards   DailyCard[]
+  sajuReadings SajuReading[]
 
   @@map("users")
 }
@@ -131,4 +132,41 @@ model DailyCard {
 
   @@unique([userId, date])
   @@map("daily_cards")
+}
+
+// ============ 사주 리딩 ============
+model SajuReading {
+  id             String   @id @default(uuid())
+  userId         String
+  name           String   // 대상자 이름
+  birthDate      DateTime // 생년월일
+  birthTime      String?  // 생시 (HH:mm 형식, 없으면 시주 제외)
+  isLunar        Boolean  @default(false) // 음력 여부
+  gender         String   @default("unknown") // male, female, unknown
+
+  // 사주 팔자 (Four Pillars)
+  yearStem       String   // 년간 (천간)
+  yearBranch     String   // 년지 (지지)
+  monthStem      String   // 월간 (천간)
+  monthBranch    String   // 월지 (지지)
+  dayStem        String   // 일간 (천간) - 일주의 주체
+  dayBranch      String   // 일지 (지지)
+  hourStem       String?  // 시간 (천간)
+  hourBranch     String?  // 시지 (지지)
+
+  // 오행 분포
+  woodCount      Int      @default(0) // 목
+  fireCount      Int      @default(0) // 화
+  earthCount     Int      @default(0) // 토
+  metalCount     Int      @default(0) // 금
+  waterCount     Int      @default(0) // 수
+
+  // 해석
+  interpretation String?  // AI 또는 전통 해석 결과
+
+  createdAt      DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("saju_readings")
 }

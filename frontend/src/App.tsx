@@ -14,6 +14,11 @@ import ReadingResult from './pages/ReadingResult';
 import History from './pages/History';
 import DailyCard from './pages/DailyCard';
 import Profile from './pages/Profile';
+import Saju from './pages/Saju';
+import SajuResult from './pages/SajuResult';
+import SajuHistory from './pages/SajuHistory';
+import SajuLearn from './pages/SajuLearn';
+import TarotLearn from './pages/TarotLearn';
 
 function App() {
   const { checkAuth, token } = useAuthStore();
@@ -32,6 +37,7 @@ function App() {
         <Route path="register" element={<Register />} />
         <Route path="cards" element={<CardLibrary />} />
         <Route path="cards/:id" element={<CardDetail />} />
+        <Route path="tarot/learn" element={<TarotLearn />} />
 
         {/* Protected Routes */}
         <Route path="reading" element={
@@ -62,6 +68,28 @@ function App() {
         <Route path="profile" element={
           <ProtectedRoute>
             <Profile />
+          </ProtectedRoute>
+        } />
+
+        {/* Saju Routes */}
+        <Route path="saju" element={
+          <ProtectedRoute>
+            <Saju />
+          </ProtectedRoute>
+        } />
+        <Route path="saju/result/:id" element={
+          <ProtectedRoute>
+            <SajuResult />
+          </ProtectedRoute>
+        } />
+        <Route path="saju/history" element={
+          <ProtectedRoute>
+            <SajuHistory />
+          </ProtectedRoute>
+        } />
+        <Route path="saju/learn" element={
+          <ProtectedRoute>
+            <SajuLearn />
           </ProtectedRoute>
         } />
       </Route>
