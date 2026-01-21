@@ -241,7 +241,7 @@ const LiquidSelect = ({
           <option
             key={option.value}
             value={option.value}
-            className="bg-[#3d3d5c] text-white"
+            className="bg-[#1a1a3a] text-white"
           >
             {option.emoji ? `${option.emoji} ` : ''}{option.label} {option.description ? `(${option.description})` : ''}
           </option>
@@ -423,7 +423,7 @@ const Saju = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-[#2a2a45] via-[#3d3d5c] to-[#4a5a7a] py-12 px-4 relative overflow-hidden">
+    <div className="min-h-screen bg-gradient-to-br from-[#0C0E23] via-[#1a1a3a] to-[#2a1a4a] py-12 px-4 relative overflow-hidden">
       <GooeyFilter />
       <AnimatedBlobs />
 

@@ -963,7 +963,7 @@ const TarotLearn = () => {
   const currentContent = learningContent[activeCategory];
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-[#2a2a45] via-[#3d3d5c] to-[#4a5a7a] py-12 px-4 relative overflow-hidden">
+    <div className="min-h-screen bg-gradient-to-br from-[#0C0E23] via-[#1a1a3a] to-[#2a1a4a] py-12 px-4 relative overflow-hidden">
       <GooeyFilter />
       <AnimatedBlobs />
 

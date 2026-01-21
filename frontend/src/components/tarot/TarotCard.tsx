@@ -117,39 +117,40 @@ const TarotCard = ({
         animate={{ rotateY: isFlipped ? 180 : 0 }}
         transition={{ duration: 0.8, ease: 'easeInOut' }}
       >
-        {/* Card Back */}
-        <div className="absolute w-full h-full rounded-2xl overflow-hidden backface-hidden shadow-2xl">
-          <div className="absolute inset-0 bg-gradient-to-br from-indigo-950 via-purple-950 to-slate-950" />
-          <div className="absolute inset-2 rounded-xl border border-accent/40" />
-          <div className="absolute inset-4 rounded-lg border border-accent/20" />
+        {/* Card Back - Vaporwave Style */}
+        <div className="absolute w-full h-full rounded-2xl overflow-hidden backface-hidden shadow-neon-purple">
+          <div className="absolute inset-0 bg-gradient-to-br from-[#0C0E23] via-[#1a1a3a] to-[#2a1a4a]" />
+          <div className="absolute inset-2 rounded-xl border border-neon-pink/40" />
+          <div className="absolute inset-4 rounded-lg border border-neon-cyan/20" />
 
-          {/* Ornate center design */}
+          {/* Ornate center design - Neon glow */}
           <div className="absolute inset-0 flex items-center justify-center">
             <div className="relative">
               <motion.div
-                className="w-28 h-28 rounded-full border-2 border-accent/60 flex items-center justify-center"
+                className="w-28 h-28 rounded-full border-2 border-neon-pink/60 flex items-center justify-center"
                 animate={{ rotate: 360 }}
                 transition={{ duration: 30, repeat: Infinity, ease: "linear" }}
+                style={{ boxShadow: '0 0 15px rgba(255, 79, 190, 0.3)' }}
               >
-                <div className="w-20 h-20 rounded-full bg-gradient-to-br from-accent/30 to-purple-900/50 flex items-center justify-center border border-accent/40">
-                  <span className="text-4xl text-accent">✦</span>
+                <div className="w-20 h-20 rounded-full bg-gradient-to-br from-neon-purple/30 to-neon-pink/20 flex items-center justify-center border border-neon-cyan/40">
+                  <span className="text-4xl text-neon-cyan" style={{ textShadow: '0 0 10px rgba(0, 240, 255, 0.7)' }}>✦</span>
                 </div>
               </motion.div>
-              <div className="absolute -top-8 left-1/2 -translate-x-1/2 text-accent/60">★</div>
-              <div className="absolute -bottom-8 left-1/2 -translate-x-1/2 text-accent/60">★</div>
-              <div className="absolute top-1/2 -left-8 -translate-y-1/2 text-accent/60">★</div>
-              <div className="absolute top-1/2 -right-8 -translate-y-1/2 text-accent/60">★</div>
+              <div className="absolute -top-8 left-1/2 -translate-x-1/2 text-neon-pink/60">★</div>
+              <div className="absolute -bottom-8 left-1/2 -translate-x-1/2 text-neon-pink/60">★</div>
+              <div className="absolute top-1/2 -left-8 -translate-y-1/2 text-neon-cyan/60">★</div>
+              <div className="absolute top-1/2 -right-8 -translate-y-1/2 text-neon-cyan/60">★</div>
             </div>
           </div>
 
           <div className="absolute bottom-6 left-0 right-0 text-center">
-            <span className="text-accent/80 text-sm tracking-[0.4em] font-serif">TAROT</span>
+            <span className="text-neon-pink/80 text-sm tracking-[0.4em] font-serif" style={{ textShadow: '0 0 8px rgba(255, 79, 190, 0.5)' }}>TAROT</span>
           </div>
 
-          <div className="absolute top-4 left-4 text-accent/40 text-xl">✧</div>
-          <div className="absolute top-4 right-4 text-accent/40 text-xl">✧</div>
-          <div className="absolute bottom-4 left-4 text-accent/40 text-xl rotate-180">✧</div>
-          <div className="absolute bottom-4 right-4 text-accent/40 text-xl rotate-180">✧</div>
+          <div className="absolute top-4 left-4 text-neon-purple/40 text-xl">✧</div>
+          <div className="absolute top-4 right-4 text-neon-cyan/40 text-xl">✧</div>
+          <div className="absolute bottom-4 left-4 text-neon-cyan/40 text-xl rotate-180">✧</div>
+          <div className="absolute bottom-4 right-4 text-neon-purple/40 text-xl rotate-180">✧</div>
         </div>
 
         {/* Card Front - 실제 이미지 사용 */}

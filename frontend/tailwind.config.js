@@ -10,21 +10,43 @@ export default {
         '44': '11rem',
       },
       colors: {
-        primary: '#3d3d5c',
-        secondary: '#4a5a7a',
-        accent: '#d4af37',
-        background: '#2a2a45',
+        // Vaporwave Color Palette
+        primary: '#0C0E23',
+        secondary: '#1a1a3a',
+        accent: '#FF4FBE',
+        background: '#0C0E23',
+        // Neon accents
+        neon: {
+          pink: '#FF4FBE',
+          cyan: '#00F0FF',
+          purple: '#9B5BFF',
+          magenta: '#FF7AD9',
+          orange: '#FF6A3D',
+        },
+        // Vaporwave gradients
+        vapor: {
+          50: '#f0f9ff',
+          100: '#e0f2fe',
+          200: '#bae6fd',
+          300: '#7dd3fc',
+          400: '#38bdf8',
+          500: '#00F0FF',
+          600: '#9B5BFF',
+          700: '#FF4FBE',
+          800: '#1a1a3a',
+          900: '#0C0E23'
+        },
         mystic: {
-          50: '#f5f3ff',
-          100: '#ede9fe',
-          200: '#ddd6fe',
-          300: '#c4b5fd',
-          400: '#a78bfa',
-          500: '#8b5cf6',
-          600: '#7c3aed',
-          700: '#5d4a8a',
-          800: '#4a3a70',
-          900: '#3d3d5c'
+          50: '#fdf4ff',
+          100: '#fae8ff',
+          200: '#f5d0fe',
+          300: '#f0abfc',
+          400: '#e879f9',
+          500: '#FF4FBE',
+          600: '#9B5BFF',
+          700: '#7c3aed',
+          800: '#1a1a3a',
+          900: '#0C0E23'
         }
       },
       fontFamily: {
@@ -37,6 +59,7 @@ export default {
         'glow': 'glow 2s ease-in-out infinite',
         'fade-in': 'fadeIn 0.5s ease-in-out',
         'slide-up': 'slideUp 0.5s ease-out',
+        'neon-pulse': 'neonPulse 2s ease-in-out infinite',
       },
       keyframes: {
         flip: {
@@ -52,8 +75,8 @@ export default {
           '50%': { transform: 'translateY(-10px)' },
         },
         glow: {
-          '0%, 100%': { boxShadow: '0 0 5px #d4af37, 0 0 10px #d4af37' },
-          '50%': { boxShadow: '0 0 20px #d4af37, 0 0 30px #d4af37' },
+          '0%, 100%': { boxShadow: '0 0 5px #FF4FBE, 0 0 10px #FF4FBE' },
+          '50%': { boxShadow: '0 0 20px #00F0FF, 0 0 30px #00F0FF' },
         },
         fadeIn: {
           '0%': { opacity: '0' },
@@ -62,11 +85,22 @@ export default {
         slideUp: {
           '0%': { transform: 'translateY(20px)', opacity: '0' },
           '100%': { transform: 'translateY(0)', opacity: '1' },
+        },
+        neonPulse: {
+          '0%, 100%': { boxShadow: '0 0 12px rgba(255, 79, 190, 0.45)' },
+          '50%': { boxShadow: '0 0 25px rgba(0, 240, 255, 0.6)' },
         }
       },
       backgroundImage: {
-        'gradient-mystic': 'linear-gradient(135deg, #3d3d5c 0%, #4a5a7a 50%, #2a2a45 100%)',
-        'gradient-gold': 'linear-gradient(135deg, #d4af37 0%, #f5d061 50%, #d4af37 100%)',
+        'gradient-mystic': 'linear-gradient(135deg, #0C0E23 0%, #1a1a3a 50%, #2a1a4a 100%)',
+        'gradient-gold': 'linear-gradient(135deg, #FF4FBE 0%, #9B5BFF 50%, #00F0FF 100%)',
+        'gradient-vaporwave': 'linear-gradient(135deg, #FF4FBE 0%, #9B5BFF 50%, #00F0FF 100%)',
+        'gradient-sunset': 'linear-gradient(180deg, #FF6A3D 0%, #FF4FBE 50%, #9B5BFF 100%)',
+      },
+      boxShadow: {
+        'neon-pink': '0 0 12px rgba(255, 79, 190, 0.45)',
+        'neon-cyan': '0 0 12px rgba(0, 240, 255, 0.45)',
+        'neon-purple': '0 0 12px rgba(155, 91, 255, 0.45)',
       }
     },
   },
