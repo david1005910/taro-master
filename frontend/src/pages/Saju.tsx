@@ -182,6 +182,101 @@ const LiquidInput = ({
   </motion.div>
 );
 
+// 시진(時辰) 옵션 정의
+const SIJU_OPTIONS = [
+  { value: '', label: '모름 / 선택 안함', description: '태어난 시간을 모르는 경우' },
+  { value: '00:00', label: '자시(子時)', description: '23:00 ~ 01:00', emoji: '🐭' },
+  { value: '02:00', label: '축시(丑時)', description: '01:00 ~ 03:00', emoji: '🐂' },
+  { value: '04:00', label: '인시(寅時)', description: '03:00 ~ 05:00', emoji: '🐯' },
+  { value: '06:00', label: '묘시(卯時)', description: '05:00 ~ 07:00', emoji: '🐰' },
+  { value: '08:00', label: '진시(辰時)', description: '07:00 ~ 09:00', emoji: '🐲' },
+  { value: '10:00', label: '사시(巳時)', description: '09:00 ~ 11:00', emoji: '🐍' },
+  { value: '12:00', label: '오시(午時)', description: '11:00 ~ 13:00', emoji: '🐴' },
+  { value: '14:00', label: '미시(未時)', description: '13:00 ~ 15:00', emoji: '🐑' },
+  { value: '16:00', label: '신시(申時)', description: '15:00 ~ 17:00', emoji: '🐵' },
+  { value: '18:00', label: '유시(酉時)', description: '17:00 ~ 19:00', emoji: '🐔' },
+  { value: '20:00', label: '술시(戌時)', description: '19:00 ~ 21:00', emoji: '🐕' },
+  { value: '22:00', label: '해시(亥時)', description: '21:00 ~ 23:00', emoji: '🐷' },
+];
+
+// 리퀴드 셀렉트 컴포넌트 (시진용)
+const LiquidSelect = ({
+  label,
+  value,
+  onChange,
+  options,
+  hint
+}: {
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+  options: typeof SIJU_OPTIONS;
+  hint?: string;
+}) => (
+  <motion.div
+    initial={{ opacity: 0, x: -20 }}
+    animate={{ opacity: 1, x: 0 }}
+    transition={{ duration: 0.4 }}
+  >
+    <label className="block text-white/80 mb-2 font-medium">
+      {label}
+      {hint && <span className="text-white/40 ml-2 text-sm">({hint})</span>}
+    </label>
+    <div className="relative group">
+      <select
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        className="
+          w-full px-5 py-4 rounded-2xl
+          bg-white/5 backdrop-blur-sm
+          border border-white/10
+          text-white
+          focus:outline-none focus:border-accent/50 focus:bg-white/10
+          transition-all duration-300
+          shadow-[inset_0_2px_4px_rgba(0,0,0,0.2)]
+          appearance-none cursor-pointer
+        "
+      >
+        {options.map((option) => (
+          <option
+            key={option.value}
+            value={option.value}
+            className="bg-[#1a1a2e] text-white"
+          >
+            {option.emoji ? `${option.emoji} ` : ''}{option.label} {option.description ? `(${option.description})` : ''}
+          </option>
+        ))}
+      </select>
+      <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-white/60">
+        ▼
+      </div>
+      <div className="absolute inset-0 rounded-2xl bg-gradient-to-r from-accent/0 via-accent/5 to-accent/0 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none" />
+    </div>
+    {/* 선택된 시진 상세 정보 표시 */}
+    {value && (
+      <motion.div
+        initial={{ opacity: 0, height: 0 }}
+        animate={{ opacity: 1, height: 'auto' }}
+        className="mt-3 p-3 rounded-xl bg-accent/10 border border-accent/20"
+      >
+        {(() => {
+          const selected = options.find(o => o.value === value);
+          if (!selected || !selected.emoji) return null;
+          return (
+            <div className="flex items-center gap-3">
+              <span className="text-2xl">{selected.emoji}</span>
+              <div>
+                <p className="text-accent font-medium">{selected.label}</p>
+                <p className="text-white/60 text-sm">{selected.description}</p>
+              </div>
+            </div>
+          );
+        })()}
+      </motion.div>
+    )}
+  </motion.div>
+);
+
 // 리퀴드 라디오 그룹
 const LiquidRadioGroup = ({
   label,
@@ -389,13 +484,13 @@ const Saju = () => {
               onChange={(val) => setFormData({ ...formData, isLunar: val })}
             />
 
-            {/* 생시 */}
-            <LiquidInput
-              label="생시"
-              type="time"
+            {/* 생시 (시진 선택) */}
+            <LiquidSelect
+              label="생시 (태어난 시간)"
               value={formData.birthTime}
-              onChange={(e) => setFormData({ ...formData, birthTime: e.target.value })}
-              hint="태어난 시간을 모르면 비워두세요"
+              onChange={(val) => setFormData({ ...formData, birthTime: val })}
+              options={SIJU_OPTIONS}
+              hint="시진을 선택하세요"
             />
 
             {/* 성별 */}
