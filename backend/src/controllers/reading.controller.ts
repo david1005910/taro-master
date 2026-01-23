@@ -55,7 +55,15 @@ export class ReadingController {
             cards: cardsWithDetails
           });
 
-          interpretation = aiResult.overallInterpretation + '\n\n' + aiResult.advice;
+          // 구조화된 해석 저장 (섹션 구분자 사용)
+          interpretation = `[QUESTION_ANSWER]
+${aiResult.questionAnswer || '카드가 전하는 메시지를 확인해보세요.'}
+
+[OVERALL]
+${aiResult.overallInterpretation}
+
+[CONCLUSION]
+${aiResult.conclusion || '카드의 메시지를 마음에 새기고 앞으로 나아가세요.'}`;
           cardInterpretations = aiResult.cardInterpretations.map((ci, idx) => ({
             position: idx,
             interpretation: ci.interpretation

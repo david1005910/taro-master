@@ -24,6 +24,7 @@
     "jsonwebtoken": "^9.0.2",
     "lunar-javascript": "^1.7.7",
     "morgan": "^1.10.0",
+    "neo4j-driver": "^6.0.1",
     "zod": "^3.22.4"
   },
   "devDependencies": {

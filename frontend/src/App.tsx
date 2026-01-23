@@ -19,6 +19,7 @@ import SajuResult from './pages/SajuResult';
 import SajuHistory from './pages/SajuHistory';
 import SajuLearn from './pages/SajuLearn';
 import TarotLearn from './pages/TarotLearn';
+import SajuTarotReading from './pages/SajuTarotReading';
 
 function App() {
   const { checkAuth, token } = useAuthStore();
@@ -90,6 +91,13 @@ function App() {
         <Route path="saju/learn" element={
           <ProtectedRoute>
             <SajuLearn />
+          </ProtectedRoute>
+        } />
+
+        {/* Saju-Tarot Integration */}
+        <Route path="saju-tarot" element={
+          <ProtectedRoute>
+            <SajuTarotReading />
           </ProtectedRoute>
         } />
       </Route>

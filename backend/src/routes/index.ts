@@ -7,6 +7,7 @@ import aiRoutes from './ai.routes';
 import progressRoutes from './progress.routes';
 import userRoutes from './user.routes';
 import sajuRoutes from './saju.routes';
+import sajuTarotRoutes from './saju-tarot.routes';
 
 const router = Router();
 
@@ -18,5 +19,6 @@ router.use('/ai', aiRoutes);
 router.use('/progress', progressRoutes);
 router.use('/users', userRoutes);
 router.use('/saju', sajuRoutes);
+router.use('/saju-tarot', sajuTarotRoutes);
 
 export default router;

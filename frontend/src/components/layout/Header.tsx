@@ -42,6 +42,9 @@ const Header = () => {
                 <Link to="/saju/learn" className="text-gray-300 hover:text-accent transition-colors">
                   사주학습
                 </Link>
+                <Link to="/saju-tarot" className="text-neon-pink hover:text-neon-cyan transition-colors">
+                  사주×타로
+                </Link>
                 <Link to="/daily" className="text-gray-300 hover:text-accent transition-colors">
                   오늘의 카드
                 </Link>
@@ -130,6 +133,13 @@ const Header = () => {
                     onClick={() => setIsMenuOpen(false)}
                   >
                     사주학습
+                  </Link>
+                  <Link
+                    to="/saju-tarot"
+                    className="text-neon-pink hover:text-neon-cyan transition-colors"
+                    onClick={() => setIsMenuOpen(false)}
+                  >
+                    사주×타로 융합
                   </Link>
                   <Link
                     to="/daily"

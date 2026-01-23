@@ -22,12 +22,13 @@ interface InterpretRequest {
 }
 
 interface InterpretResponse {
+  questionAnswer: string;  // 질문에 대한 직접적인 답변
   overallInterpretation: string;
   cardInterpretations: Array<{
     position: string;
     interpretation: string;
   }>;
-  advice: string;
+  conclusion: string;  // 최종 결론 및 조언
 }
 
 export class AIService {
@@ -38,19 +39,21 @@ export class AIService {
 해석 원칙:
 1. 각 카드의 전통적 의미를 존중하면서 현대적 맥락에 적용
 2. 카드 간의 관계와 흐름을 분석
-3. 질문자의 질문에 맞춤화된 해석
+3. 질문자의 질문에 직접적으로 답변
 4. 긍정적이고 건설적인 관점 유지
 5. 역방향 카드는 도전이나 내면적 측면으로 해석
 6. 한국어로 응답
+7. 마지막에 반드시 종합적인 결론과 실질적인 조언 제공
 
 응답 형식:
 반드시 아래 JSON 형식으로만 응답하세요:
 {
+  "questionAnswer": "질문에 대한 직접적인 답변 (150-200자) - 질문이 없으면 현재 상황에 대한 핵심 메시지",
   "overallInterpretation": "전체 종합 해석 (200-300자)",
   "cardInterpretations": [
     { "position": "위치명", "interpretation": "해당 위치 카드 해석 (100-150자)" }
   ],
-  "advice": "실질적인 조언 (100-150자)"
+  "conclusion": "🔮 최종 결론 및 조언: 모든 카드를 종합한 핵심 메시지와 실질적인 행동 조언 (150-200자)"
 }`;
 
   async interpret(request: InterpretRequest): Promise<InterpretResponse> {
