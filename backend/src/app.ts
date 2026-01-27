@@ -11,7 +11,21 @@ const app = express();
 // 미들웨어
 app.use(helmet());
 app.use(cors({
-  origin: config.FRONTEND_URL,
+  origin: (origin, callback) => {
+    // 허용할 origin 목록
+    const allowedOrigins = [
+      config.FRONTEND_URL,
+      'http://localhost:5173',
+      'http://localhost:5174',
+      'http://localhost:5175'
+    ];
+    // origin이 없거나 (같은 출처) 허용 목록에 있으면 허용
+    if (!origin || allowedOrigins.includes(origin)) {
+      callback(null, true);
+    } else {
+      callback(new Error('CORS not allowed'));
+    }
+  },
   credentials: true
 }));
 app.use(morgan('dev'));
