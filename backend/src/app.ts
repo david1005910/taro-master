@@ -17,7 +17,8 @@ app.use(cors({
       config.FRONTEND_URL,
       'http://localhost:5173',
       'http://localhost:5174',
-      'http://localhost:5175'
+      'http://localhost:5175',
+      'http://localhost:5176'
     ];
     // origin이 없거나 (같은 출처) 허용 목록에 있으면 허용
     if (!origin || allowedOrigins.includes(origin)) {
