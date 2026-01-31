@@ -78,10 +78,12 @@ export const useAuthStore = create<AuthState>()(
         const token = get().token;
         if (!token) return;
 
+        set({ isLoading: true });
         try {
           const { data } = await api.get('/users/me');
-          set({ user: data.data, isAuthenticated: true });
+          set({ user: data.data, isAuthenticated: true, isLoading: false });
         } catch {
+          set({ isLoading: false });
           get().logout();
         }
       },

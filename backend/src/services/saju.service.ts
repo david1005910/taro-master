@@ -69,6 +69,159 @@ const HOUR_TO_BRANCH: Record<number, number> = {
   21: 11, 22: 11  // 해시 (21:00-23:00)
 };
 
+// ========== 지장간(支藏干) - 지지 속에 숨겨진 천간 ==========
+const HIDDEN_STEMS: Record<string, string[]> = {
+  '자': ['계'],
+  '축': ['기', '계', '신'],
+  '인': ['갑', '병', '무'],
+  '묘': ['을'],
+  '진': ['무', '을', '계'],
+  '사': ['병', '경', '무'],
+  '오': ['정', '기'],
+  '미': ['기', '정', '을'],
+  '신': ['경', '임', '무'],
+  '유': ['신'],
+  '술': ['무', '신', '정'],
+  '해': ['임', '갑']
+};
+
+// 지지의 본기(本氣) - 주된 천간
+const BRANCH_MAIN_STEM: Record<string, string> = {
+  '자': '계', '축': '기', '인': '갑', '묘': '을',
+  '진': '무', '사': '병', '오': '정', '미': '기',
+  '신': '경', '유': '신', '술': '무', '해': '임'
+};
+
+// ========== 오행 상생상극 관계 ==========
+const GENERATING: Record<string, string> = { '목': '화', '화': '토', '토': '금', '금': '수', '수': '목' };
+const GENERATED_BY: Record<string, string> = { '목': '수', '화': '목', '토': '화', '금': '토', '수': '금' };
+const CONTROLLING: Record<string, string> = { '목': '토', '토': '수', '수': '화', '화': '금', '금': '목' };
+const CONTROLLED_BY: Record<string, string> = { '목': '금', '화': '수', '토': '목', '금': '화', '수': '토' };
+
+// ========== 십성(十星) 관계 매핑 ==========
+// [일간 오행 → 대상 오행] + 음양 비교 = 십성
+type TenGodName = '비견' | '겁재' | '식신' | '상관' | '편재' | '정재' | '편관' | '정관' | '편인' | '정인';
+
+const TEN_GOD_DETAILS: Record<TenGodName, {
+  category: string;
+  symbol: string;
+  meaning: string;
+  traits: string;
+  relation: string;
+}> = {
+  '비견': { category: '비겁', symbol: '🤝', meaning: '나와 같은 기운', traits: '독립심, 자존심, 경쟁심, 동료의식', relation: '형제, 친구, 동료' },
+  '겁재': { category: '비겁', symbol: '😤', meaning: '나와 비슷한 경쟁자', traits: '승부욕, 사교성, 큰 씀씀이, 투쟁심', relation: '이복형제, 경쟁자' },
+  '식신': { category: '식상', symbol: '😋', meaning: '내가 낳는 것(양)', traits: '먹복, 낙천적, 표현력, 창작력', relation: '자식(여자), 재능, 먹거리' },
+  '상관': { category: '식상', symbol: '🎤', meaning: '내가 낳는 것(음)', traits: '끼, 독창성, 비판정신, 자유로움', relation: '자식(남자), 예술, 기술' },
+  '편재': { category: '재성', symbol: '🎰', meaning: '내가 다스리는 것(양)', traits: '투자, 사업가 기질, 통큰 씀씀이', relation: '아버지, 사업재물, 여자(남자)' },
+  '정재': { category: '재성', symbol: '💵', meaning: '내가 다스리는 것(음)', traits: '근검절약, 알뜰함, 안정 추구', relation: '아내(남자), 월급, 저축' },
+  '편관': { category: '관살', symbol: '⚔️', meaning: '나를 다스리는 것(양)', traits: '카리스마, 권위, 도전, 압박', relation: '남편(여자), 직장상사, 권력' },
+  '정관': { category: '관살', symbol: '🏛️', meaning: '나를 다스리는 것(음)', traits: '품위, 질서, 명예, 책임감', relation: '남편(여자), 직장, 명예' },
+  '편인': { category: '인성', symbol: '🔮', meaning: '나를 낳는 것(양)', traits: '독창적 학문, 영감, 종교, 특수재능', relation: '계모, 특수학문, 편법' },
+  '정인': { category: '인성', symbol: '📖', meaning: '나를 낳는 것(음)', traits: '학습능력, 자비, 어머니의 사랑', relation: '어머니, 학력, 정통학문' }
+};
+
+// ========== 십이운성(十二運星) ==========
+const TWELVE_STAGES = ['장생', '목욕', '관대', '건록', '제왕', '쇠', '병', '사', '묘', '절', '태', '양'] as const;
+type TwelveStageName = typeof TWELVE_STAGES[number];
+
+// 각 천간별 장생 위치 (십이운성 시작 지지 인덱스)
+const TWELVE_STAGE_TABLE: Record<string, Record<string, TwelveStageName>> = {
+  '갑': { '해': '장생', '자': '목욕', '축': '관대', '인': '건록', '묘': '제왕', '진': '쇠', '사': '병', '오': '사', '미': '묘', '신': '절', '유': '태', '술': '양' },
+  '을': { '오': '장생', '사': '목욕', '진': '관대', '묘': '건록', '인': '제왕', '축': '쇠', '자': '병', '해': '사', '술': '묘', '유': '절', '신': '태', '미': '양' },
+  '병': { '인': '장생', '묘': '목욕', '진': '관대', '사': '건록', '오': '제왕', '미': '쇠', '신': '병', '유': '사', '술': '묘', '해': '절', '자': '태', '축': '양' },
+  '정': { '유': '장생', '신': '목욕', '미': '관대', '오': '건록', '사': '제왕', '진': '쇠', '묘': '병', '인': '사', '축': '묘', '자': '절', '해': '태', '술': '양' },
+  '무': { '인': '장생', '묘': '목욕', '진': '관대', '사': '건록', '오': '제왕', '미': '쇠', '신': '병', '유': '사', '술': '묘', '해': '절', '자': '태', '축': '양' },
+  '기': { '유': '장생', '신': '목욕', '미': '관대', '오': '건록', '사': '제왕', '진': '쇠', '묘': '병', '인': '사', '축': '묘', '자': '절', '해': '태', '술': '양' },
+  '경': { '사': '장생', '오': '목욕', '미': '관대', '신': '건록', '유': '제왕', '술': '쇠', '해': '병', '자': '사', '축': '묘', '인': '절', '묘': '태', '진': '양' },
+  '신': { '자': '장생', '해': '목욕', '술': '관대', '유': '건록', '신': '제왕', '미': '쇠', '오': '병', '사': '사', '진': '묘', '묘': '절', '인': '태', '축': '양' },
+  '임': { '신': '장생', '유': '목욕', '술': '관대', '해': '건록', '자': '제왕', '축': '쇠', '인': '병', '묘': '사', '진': '묘', '사': '절', '오': '태', '미': '양' },
+  '계': { '묘': '장생', '인': '목욕', '축': '관대', '자': '건록', '해': '제왕', '술': '쇠', '유': '병', '신': '사', '미': '묘', '오': '절', '사': '태', '진': '양' }
+};
+
+const TWELVE_STAGE_DETAILS: Record<TwelveStageName, { symbol: string; description: string; energy: number }> = {
+  '장생': { symbol: '🌅', description: '새로운 시작, 탄생의 에너지! 생명력이 솟아나는 단계', energy: 7 },
+  '목욕': { symbol: '🛁', description: '성장통의 시기. 시행착오를 겪지만 정화되는 단계', energy: 5 },
+  '관대': { symbol: '👑', description: '성인식! 사회에 나설 준비가 된 활기찬 단계', energy: 8 },
+  '건록': { symbol: '💪', description: '독립과 자립! 가장 안정적인 에너지의 단계', energy: 9 },
+  '제왕': { symbol: '🏆', description: '최고점! 능력이 절정에 달한 단계', energy: 10 },
+  '쇠': { symbol: '🍂', description: '하강의 시작. 경험으로 지혜가 생기는 단계', energy: 6 },
+  '병': { symbol: '🤒', description: '기운이 약해짐. 건강 관리가 필요한 단계', energy: 4 },
+  '사': { symbol: '💫', description: '정지의 시기. 내면으로 향하는 단계', energy: 3 },
+  '묘': { symbol: '🏺', description: '저장과 보존. 잠재력이 축적되는 단계', energy: 2 },
+  '절': { symbol: '✂️', description: '단절과 변화. 새 출발을 준비하는 단계', energy: 1 },
+  '태': { symbol: '🥒', description: '잉태! 새로운 가능성이 싹트는 단계', energy: 3 },
+  '양': { symbol: '🤱', description: '양육! 보호 속에서 자라나는 단계', energy: 5 }
+};
+
+// ========== 신살(神殺) ==========
+// 천을귀인(天乙貴人) - 일간 기준
+const CHEONUL_GWIIN: Record<string, string[]> = {
+  '갑': ['축', '미'], '을': ['자', '신'], '병': ['해', '유'], '정': ['해', '유'],
+  '무': ['축', '미'], '기': ['자', '신'], '경': ['축', '미'], '신': ['오', '인'],
+  '임': ['사', '묘'], '계': ['사', '묘']
+};
+
+// 역마살(驛馬殺) - 년지/일지 기준
+const YEOKMA: Record<string, string> = {
+  '인': '신', '오': '신', '술': '신',
+  '사': '해', '유': '해', '축': '해',
+  '신': '인', '자': '인', '진': '인',
+  '해': '사', '묘': '사', '미': '사'
+};
+
+// 도화살(桃花殺) - 년지/일지 기준
+const DOHWA: Record<string, string> = {
+  '인': '묘', '오': '묘', '술': '묘',
+  '사': '오', '유': '오', '축': '오',
+  '신': '유', '자': '유', '진': '유',
+  '해': '자', '묘': '자', '미': '자'
+};
+
+// 화개살(華蓋殺) - 년지 기준
+const HWAGAE: Record<string, string> = {
+  '인': '술', '오': '술', '술': '술',
+  '사': '축', '유': '축', '축': '축',
+  '신': '진', '자': '진', '진': '진',
+  '해': '미', '묘': '미', '미': '미'
+};
+
+// 문창귀인(文昌貴人) - 일간 기준
+const MUNCHANG: Record<string, string> = {
+  '갑': '사', '을': '오', '병': '신', '정': '유', '무': '신',
+  '기': '유', '경': '해', '신': '자', '임': '인', '계': '묘'
+};
+
+// 양인살(羊刃殺) - 일간 기준
+const YANGIN: Record<string, string> = {
+  '갑': '묘', '을': '인', '병': '오', '정': '사', '무': '오',
+  '기': '사', '경': '유', '신': '신', '임': '자', '계': '해'
+};
+
+// 공망(空亡) - 일주 기준 (간략화)
+const GONGMANG_TABLE: Record<string, string[]> = {
+  '갑자': ['술', '해'], '갑술': ['신', '유'], '갑신': ['오', '미'],
+  '갑오': ['진', '사'], '갑진': ['인', '묘'], '갑인': ['자', '축'],
+  '을축': ['술', '해'], '을해': ['신', '유'], '을유': ['오', '미'],
+  '을미': ['진', '사'], '을사': ['인', '묘'], '을묘': ['자', '축'],
+  '병인': ['술', '해'], '병자': ['신', '유'], '병술': ['오', '미'],
+  '병신': ['진', '사'], '병오': ['인', '묘'], '병진': ['자', '축'],
+  '정묘': ['술', '해'], '정축': ['신', '유'], '정해': ['오', '미'],
+  '정유': ['진', '사'], '정미': ['인', '묘'], '정사': ['자', '축'],
+  '무진': ['술', '해'], '무인': ['신', '유'], '무자': ['오', '미'],
+  '무술': ['진', '사'], '무신': ['인', '묘'], '무오': ['자', '축'],
+  '기사': ['술', '해'], '기묘': ['신', '유'], '기축': ['오', '미'],
+  '기해': ['진', '사'], '기유': ['인', '묘'], '기미': ['자', '축'],
+  '경오': ['술', '해'], '경진': ['신', '유'], '경인': ['오', '미'],
+  '경자': ['진', '사'], '경술': ['인', '묘'], '경신': ['자', '축'],
+  '신미': ['술', '해'], '신사': ['신', '유'], '신묘': ['오', '미'],
+  '신축': ['진', '사'], '신해': ['인', '묘'], '신유': ['자', '축'],
+  '임신': ['술', '해'], '임오': ['신', '유'], '임진': ['오', '미'],
+  '임인': ['진', '사'], '임자': ['인', '묘'], '임술': ['자', '축'],
+  '계유': ['술', '해'], '계미': ['신', '유'], '계사': ['오', '미'],
+  '계묘': ['진', '사'], '계축': ['인', '묘'], '계해': ['자', '축']
+};
+
 interface SajuInput {
   userId: string;
   name: string;
@@ -141,11 +294,52 @@ export class SajuService {
       }
     });
 
+    // 추가 분석 데이터 생성
+    const tenGods = this.calculateAllTenGods(fourPillars);
+    const strengthAnalysis = this.calculateStrengthWeakness(fourPillars, elementCount);
+    const twelveStages = this.calculateTwelveStages(fourPillars);
+    const spiritStars = this.calculateSpiritStars(fourPillars);
+    const geokguk = this.determineGeokguk(fourPillars, tenGods);
+
     return {
       ...sajuReading,
       fourPillarsDisplay: this.getFourPillarsDisplay(fourPillars),
       elementAnalysis: this.getElementAnalysis(elementCount),
-      zodiacAnimal: EARTHLY_BRANCHES_ANIMALS[EARTHLY_BRANCHES.indexOf(fourPillars.yearBranch)]
+      zodiacAnimal: EARTHLY_BRANCHES_ANIMALS[EARTHLY_BRANCHES.indexOf(fourPillars.yearBranch)],
+      advancedAnalysis: {
+        tenGods: {
+          yearStemGod: tenGods.yearStemGod,
+          yearBranchGod: tenGods.yearBranchGod,
+          monthStemGod: tenGods.monthStemGod,
+          monthBranchGod: tenGods.monthBranchGod,
+          dayBranchGod: tenGods.dayBranchGod,
+          hourStemGod: tenGods.hourStemGod,
+          hourBranchGod: tenGods.hourBranchGod,
+          godCounts: tenGods.godCounts
+        },
+        strength: {
+          level: strengthAnalysis.level,
+          isStrong: strengthAnalysis.isStrong,
+          score: strengthAnalysis.score,
+          description: strengthAnalysis.description,
+          yongshin: strengthAnalysis.yongshin,
+          yongshinElement: strengthAnalysis.yongshinElement,
+          gisin: strengthAnalysis.gisin
+        },
+        twelveStages: {
+          yearStage: twelveStages.yearStage,
+          monthStage: twelveStages.monthStage,
+          dayStage: twelveStages.dayStage,
+          hourStage: twelveStages.hourStage,
+          overallEnergy: twelveStages.overallEnergy
+        },
+        spiritStars: spiritStars.stars,
+        geokguk: {
+          name: geokguk.name,
+          description: geokguk.description,
+          traits: geokguk.traits
+        }
+      }
     };
   }
 
@@ -198,6 +392,274 @@ export class SajuService {
       const index = EARTHLY_BRANCHES_HANJA.indexOf(hanja);
       return index !== -1 ? EARTHLY_BRANCHES[index] : hanja;
     }
+  }
+
+  // ========== 십성(十星) 계산 ==========
+  private calculateTenGod(dayStem: string, targetStem: string): TenGodName {
+    const dayElement = FIVE_ELEMENTS[STEM_ELEMENTS[dayStem] as keyof typeof FIVE_ELEMENTS];
+    const targetElement = FIVE_ELEMENTS[STEM_ELEMENTS[targetStem] as keyof typeof FIVE_ELEMENTS];
+    const dayYinYang = STEM_YIN_YANG[dayStem];
+    const targetYinYang = STEM_YIN_YANG[targetStem];
+    const sameYinYang = dayYinYang === targetYinYang;
+
+    if (dayElement === targetElement) {
+      return sameYinYang ? '비견' : '겁재';
+    } else if (GENERATING[dayElement] === targetElement) {
+      return sameYinYang ? '식신' : '상관';
+    } else if (CONTROLLING[dayElement] === targetElement) {
+      return sameYinYang ? '편재' : '정재';
+    } else if (CONTROLLED_BY[dayElement] === targetElement) {
+      return sameYinYang ? '편관' : '정관';
+    } else if (GENERATED_BY[dayElement] === targetElement) {
+      return sameYinYang ? '편인' : '정인';
+    }
+    return '비견'; // fallback
+  }
+
+  // 사주 전체의 십성 배열 계산
+  private calculateAllTenGods(fourPillars: FourPillars): {
+    yearStemGod: TenGodName; yearBranchGod: TenGodName;
+    monthStemGod: TenGodName; monthBranchGod: TenGodName;
+    dayStemGod: string; dayBranchGod: TenGodName;
+    hourStemGod?: TenGodName; hourBranchGod?: TenGodName;
+    godCounts: Record<TenGodName, number>;
+  } {
+    const ds = fourPillars.dayStem;
+
+    const yearStemGod = this.calculateTenGod(ds, fourPillars.yearStem);
+    const yearBranchGod = this.calculateTenGod(ds, BRANCH_MAIN_STEM[fourPillars.yearBranch]);
+    const monthStemGod = this.calculateTenGod(ds, fourPillars.monthStem);
+    const monthBranchGod = this.calculateTenGod(ds, BRANCH_MAIN_STEM[fourPillars.monthBranch]);
+    const dayBranchGod = this.calculateTenGod(ds, BRANCH_MAIN_STEM[fourPillars.dayBranch]);
+
+    const gods: TenGodName[] = [yearStemGod, yearBranchGod, monthStemGod, monthBranchGod, dayBranchGod];
+
+    let hourStemGod: TenGodName | undefined;
+    let hourBranchGod: TenGodName | undefined;
+    if (fourPillars.hourStem && fourPillars.hourBranch) {
+      hourStemGod = this.calculateTenGod(ds, fourPillars.hourStem);
+      hourBranchGod = this.calculateTenGod(ds, BRANCH_MAIN_STEM[fourPillars.hourBranch]);
+      gods.push(hourStemGod, hourBranchGod);
+    }
+
+    // 십성 개수 집계
+    const godCounts = {} as Record<TenGodName, number>;
+    const allGodNames: TenGodName[] = ['비견', '겁재', '식신', '상관', '편재', '정재', '편관', '정관', '편인', '정인'];
+    allGodNames.forEach(g => godCounts[g] = 0);
+    gods.forEach(g => godCounts[g]++);
+
+    return { yearStemGod, yearBranchGod, monthStemGod, monthBranchGod, dayStemGod: '일간(나)', dayBranchGod, hourStemGod, hourBranchGod, godCounts };
+  }
+
+  // ========== 신강신약(身強身弱) 판단 ==========
+  private calculateStrengthWeakness(fourPillars: FourPillars, elementCount: ElementCount): {
+    isStrong: boolean;
+    score: number;
+    helpScore: number;
+    drainScore: number;
+    level: string;
+    description: string;
+    yongshin: string;
+    yongshinElement: string;
+    gisin: string;
+  } {
+    const dayStemEl = FIVE_ELEMENTS[STEM_ELEMENTS[fourPillars.dayStem] as keyof typeof FIVE_ELEMENTS];
+    const helpEl = GENERATED_BY[dayStemEl]; // 나를 생하는 오행 (인성)
+    const sameEl = dayStemEl; // 나와 같은 오행 (비겁)
+    const drainEl1 = GENERATING[dayStemEl]; // 내가 생하는 오행 (식상)
+    const drainEl2 = CONTROLLING[dayStemEl]; // 내가 극하는 오행 (재성)
+    const drainEl3 = CONTROLLED_BY[dayStemEl]; // 나를 극하는 오행 (관살)
+
+    const getCount = (el: string): number => {
+      switch (el) {
+        case '목': return elementCount.woodCount;
+        case '화': return elementCount.fireCount;
+        case '토': return elementCount.earthCount;
+        case '금': return elementCount.metalCount;
+        case '수': return elementCount.waterCount;
+        default: return 0;
+      }
+    };
+
+    // 나를 도와주는 힘 (비겁 + 인성)
+    const helpScore = getCount(sameEl) + getCount(helpEl);
+    // 나를 빼앗는 힘 (식상 + 재성 + 관살)
+    const drainScore = getCount(drainEl1) + getCount(drainEl2) + getCount(drainEl3);
+
+    // 월지(월주 지지)가 일간을 생하거나 같으면 보너스
+    const monthBranchEl = FIVE_ELEMENTS[BRANCH_ELEMENTS[fourPillars.monthBranch] as keyof typeof FIVE_ELEMENTS];
+    let bonus = 0;
+    if (monthBranchEl === sameEl || monthBranchEl === helpEl) bonus = 1;
+
+    const score = helpScore + bonus - drainScore;
+    const isStrong = score > 0;
+
+    let level: string;
+    let description: string;
+    if (score >= 3) {
+      level = '극신강(極身強)';
+      description = '매우 강한 자아를 가졌습니다. 에너지가 넘쳐서 활동적이고 독립적이며, 자기 주장이 매우 강합니다.';
+    } else if (score >= 1) {
+      level = '신강(身強)';
+      description = '자아가 강한 편입니다. 자신감이 있고 주도적이며, 도전을 두려워하지 않습니다.';
+    } else if (score >= -1) {
+      level = '중화(中和)';
+      description = '균형 잡힌 상태입니다. 상황에 따라 유연하게 대처하며, 안정적인 삶을 영위합니다.';
+    } else if (score >= -3) {
+      level = '신약(身弱)';
+      description = '자아가 약한 편입니다. 타인에게 의지하는 경향이 있으나, 협력을 통해 큰 성과를 낼 수 있습니다.';
+    } else {
+      level = '극신약(極身弱)';
+      description = '매우 약한 자아입니다. 환경의 영향을 많이 받지만, 종교나 예술 분야에서 큰 성취를 이룰 수 있습니다.';
+    }
+
+    // 용신(用神) 결정 - PDF 교재 기반
+    let yongshin: string;
+    let yongshinElement: string;
+    let gisin: string;
+    if (isStrong) {
+      // 신강 → 나를 소모시키는 오행이 용신 (식상, 재성, 관살)
+      yongshinElement = drainEl1; // 식상 우선
+      yongshin = `${yongshinElement}(${drainEl1 === GENERATING[dayStemEl] ? '식상' : '재성'})`;
+      gisin = `${helpEl}(인성), ${sameEl}(비겁)`;
+    } else {
+      // 신약 → 나를 도와주는 오행이 용신 (인성, 비겁)
+      yongshinElement = helpEl; // 인성 우선
+      yongshin = `${yongshinElement}(인성)`;
+      gisin = `${drainEl2}(재성), ${drainEl3}(관살)`;
+    }
+
+    return { isStrong, score, helpScore, drainScore, level, description, yongshin, yongshinElement, gisin };
+  }
+
+  // ========== 십이운성(十二運星) 계산 ==========
+  private calculateTwelveStages(fourPillars: FourPillars): {
+    yearStage: TwelveStageName; monthStage: TwelveStageName;
+    dayStage: TwelveStageName; hourStage?: TwelveStageName;
+    overallEnergy: number;
+  } {
+    const ds = fourPillars.dayStem;
+    const stageTable = TWELVE_STAGE_TABLE[ds];
+
+    const yearStage = stageTable?.[fourPillars.yearBranch] || '장생';
+    const monthStage = stageTable?.[fourPillars.monthBranch] || '장생';
+    const dayStage = stageTable?.[fourPillars.dayBranch] || '장생';
+    let hourStage: TwelveStageName | undefined;
+
+    if (fourPillars.hourBranch) {
+      hourStage = stageTable?.[fourPillars.hourBranch] || '장생';
+    }
+
+    // 전체 에너지 레벨 계산
+    const stages = [yearStage, monthStage, dayStage];
+    if (hourStage) stages.push(hourStage);
+    const totalEnergy = stages.reduce((sum, s) => sum + (TWELVE_STAGE_DETAILS[s]?.energy || 5), 0);
+    const overallEnergy = Math.round(totalEnergy / stages.length);
+
+    return { yearStage, monthStage, dayStage, hourStage, overallEnergy };
+  }
+
+  // ========== 신살(神殺) 계산 ==========
+  private calculateSpiritStars(fourPillars: FourPillars): {
+    stars: { name: string; type: 'good' | 'bad' | 'neutral'; symbol: string; description: string; pillar: string }[];
+  } {
+    const ds = fourPillars.dayStem;
+    const yb = fourPillars.yearBranch;
+    const db = fourPillars.dayBranch;
+    const allBranches = [fourPillars.yearBranch, fourPillars.monthBranch, fourPillars.dayBranch];
+    if (fourPillars.hourBranch) allBranches.push(fourPillars.hourBranch);
+
+    const stars: { name: string; type: 'good' | 'bad' | 'neutral'; symbol: string; description: string; pillar: string }[] = [];
+
+    // 천을귀인(天乙貴人) - 일간 기준, 사주 내 지지에 있는지
+    const gwiin = CHEONUL_GWIIN[ds] || [];
+    allBranches.forEach((b, i) => {
+      if (gwiin.includes(b)) {
+        const pillarName = ['년주', '월주', '일주', '시주'][i];
+        stars.push({ name: '천을귀인', type: 'good', symbol: '👼', description: '어려울 때 귀인이 나타나는 최고의 길신! 위기에 강하고 도움을 잘 받아요.', pillar: pillarName });
+      }
+    });
+
+    // 문창귀인 - 일간 기준
+    const munchang = MUNCHANG[ds];
+    allBranches.forEach((b, i) => {
+      if (b === munchang) {
+        const pillarName = ['년주', '월주', '일주', '시주'][i];
+        stars.push({ name: '문창귀인', type: 'good', symbol: '📚', description: '학업과 시험운이 좋아요! 공부, 자격증, 승진에 유리해요.', pillar: pillarName });
+      }
+    });
+
+    // 역마살 - 년지/일지 기준
+    const yeokmaYear = YEOKMA[yb];
+    const yeokmaDay = YEOKMA[db];
+    allBranches.forEach((b, i) => {
+      if (b === yeokmaYear || b === yeokmaDay) {
+        const pillarName = ['년주', '월주', '일주', '시주'][i];
+        stars.push({ name: '역마살', type: 'neutral', symbol: '✈️', description: '이동과 변화가 많아요! 해외, 출장, 이직 인연이 있어요.', pillar: pillarName });
+      }
+    });
+
+    // 도화살 - 년지 기준
+    const dohwa = DOHWA[yb];
+    allBranches.forEach((b, i) => {
+      if (b === dohwa) {
+        const pillarName = ['년주', '월주', '일주', '시주'][i];
+        stars.push({ name: '도화살', type: 'neutral', symbol: '💕', description: '매력적이고 이성에게 인기 많아요! 연예인, 서비스직에 유리해요.', pillar: pillarName });
+      }
+    });
+
+    // 화개살 - 년지 기준
+    const hwagae = HWAGAE[yb];
+    allBranches.forEach((b, i) => {
+      if (b === hwagae) {
+        const pillarName = ['년주', '월주', '일주', '시주'][i];
+        stars.push({ name: '화개살', type: 'neutral', symbol: '🎨', description: '예술적 감각이 뛰어나요! 종교, 철학, 예술에 재능이 있어요.', pillar: pillarName });
+      }
+    });
+
+    // 양인살 - 일간 기준
+    const yangin = YANGIN[ds];
+    allBranches.forEach((b, i) => {
+      if (b === yangin) {
+        const pillarName = ['년주', '월주', '일주', '시주'][i];
+        stars.push({ name: '양인살', type: 'bad', symbol: '🗡️', description: '강한 추진력이 있지만 과격해질 수 있어요. 수술수, 사고 주의!', pillar: pillarName });
+      }
+    });
+
+    // 공망 - 일주 기준
+    const dayPillar = fourPillars.dayStem + fourPillars.dayBranch;
+    const gongmang = GONGMANG_TABLE[dayPillar] || [];
+    allBranches.forEach((b, i) => {
+      if (i !== 2 && gongmang.includes(b)) { // 일주 자체는 제외
+        const pillarName = ['년주', '월주', '일주', '시주'][i];
+        stars.push({ name: '공망', type: 'bad', symbol: '🕳️', description: '공허한 에너지. 해당 주의 운이 약해지지만, 종교/예술에는 오히려 좋아요.', pillar: pillarName });
+      }
+    });
+
+    return { stars };
+  }
+
+  // ========== 격국(格局) 판단 ==========
+  private determineGeokguk(fourPillars: FourPillars, tenGods: { monthStemGod: TenGodName; monthBranchGod: TenGodName }): {
+    name: string; description: string; traits: string;
+  } {
+    // 격국은 주로 월주의 십성으로 판단 (월지 본기 기준)
+    const monthGod = tenGods.monthBranchGod;
+
+    const geokgukMap: Record<string, { name: string; description: string; traits: string }> = {
+      '비견': { name: '건록격(建祿格)', description: '독립심이 강하고 자수성가하는 격국입니다.', traits: '자존심, 독립심, 경쟁심이 강하며 스스로 운을 개척합니다. 재물은 스스로 벌어야 하며, 남의 도움보다 자신의 노력이 중요합니다.' },
+      '겁재': { name: '양인격(羊刃格)', description: '강한 추진력과 결단력의 격국입니다.', traits: '용기와 결단력이 있으나 과격해질 수 있습니다. 리더십이 뛰어나고, 위기 상황에서 빛을 발합니다. 단, 충돌에 주의해야 합니다.' },
+      '식신': { name: '식신격(食神格)', description: '먹복과 재능의 격국입니다.', traits: '먹는 복이 있고, 재능을 발휘하여 돈을 법니다. 낙천적이고 여유로우며, 표현력이 뛰어납니다. 음식, 문화, 예술 분야에 유리합니다.' },
+      '상관': { name: '상관격(傷官格)', description: '끼와 독창성의 격국입니다.', traits: '총명하고 끼가 넘치며, 비판 정신이 강합니다. 예술가, 기술자 기질이 있고, 틀에 얽매이지 않습니다. 단, 관(직장)과 충돌이 있을 수 있습니다.' },
+      '편재': { name: '편재격(偏財格)', description: '사업가 기질의 격국입니다.', traits: '통이 크고 사교성이 좋습니다. 사업, 투자에 재능이 있으며, 횡재수도 있습니다. 단, 돈의 출입이 크므로 관리가 필요합니다.' },
+      '정재': { name: '정재격(正財格)', description: '안정적인 재물의 격국입니다.', traits: '근검절약하고 알뜰합니다. 꾸준히 모아서 재산을 만들며, 안정적인 직장 생활이 적합합니다. 성실하고 신용이 좋습니다.' },
+      '편관': { name: '편관격(偏官格)/칠살격', description: '권위와 리더십의 격국입니다.', traits: '카리스마가 있고 리더십이 강합니다. 군인, 경찰, 검찰 등 권위 있는 직업에 유리합니다. 도전과 경쟁을 즐기며, 압박을 성장의 원동력으로 삼습니다.' },
+      '정관': { name: '정관격(正官格)', description: '명예와 안정의 격국입니다.', traits: '품위 있고 질서를 중시합니다. 공무원, 대기업 등 안정적인 조직에서 출세합니다. 사회적 명예와 지위를 얻기 쉬우며, 반듯한 인생을 삽니다.' },
+      '편인': { name: '편인격(偏印格)/효신격', description: '특수 재능의 격국입니다.', traits: '독특한 사고와 특수한 재능이 있습니다. 종교, 철학, 점술, 의학 등 특수 분야에 뛰어나며, 일반적이지 않은 삶을 살 수 있습니다.' },
+      '정인': { name: '정인격(正印格)', description: '학문과 지식의 격국입니다.', traits: '학습 능력이 뛰어나고 자비로운 마음을 가졌습니다. 교육자, 학자, 전문가로 성공하며, 어머니의 덕이 있습니다. 문서운과 학력운이 좋습니다.' }
+    };
+
+    return geokgukMap[monthGod] || geokgukMap['정관'];
   }
 
   // 오행 분포 계산
@@ -505,12 +967,22 @@ export class SajuService {
     const weakest = sorted.filter(e => e.count === 0);
     const total = elements.reduce((sum, e) => sum + e.count, 0);
 
-    // 용신(用神) 계산 - 일간을 생(生)하거나 도와주는 오행
-    const generatingElement: Record<string, string> = {
-      '목': '수', '화': '목', '토': '화', '금': '토', '수': '금'
-    };
+    // 용신(用神) 계산 - 신강신약 기반
     const dayStemEl = FIVE_ELEMENTS[dayStemElement as keyof typeof FIVE_ELEMENTS];
-    const helpingElement = generatingElement[dayStemEl];
+    const strengthAnalysis = this.calculateStrengthWeakness(fourPillars, elementCount);
+    const helpingElement = strengthAnalysis.yongshinElement;
+
+    // 십성 계산
+    const tenGods = this.calculateAllTenGods(fourPillars);
+
+    // 격국 판단
+    const geokguk = this.determineGeokguk(fourPillars, tenGods);
+
+    // 십이운성 계산
+    const twelveStages = this.calculateTwelveStages(fourPillars);
+
+    // 신살 계산
+    const spiritStars = this.calculateSpiritStars(fourPillars);
 
     // ========== 해석 생성 ==========
     let interpretation = '';
@@ -631,6 +1103,154 @@ export class SajuService {
     } else {
       interpretation += `🌟 와! 오행이 꽤 균형 잡혀 있네요!\n`;
       interpretation += `   타고나길 잘 타고나신 편이에요! 부러워요~ 😄\n\n`;
+    }
+
+    // ========== 십성(十星) 분석 섹션 ==========
+    interpretation += `【 🎭 십성(十星) 분석 - 나와 세상의 관계 지도! 】\n\n`;
+    interpretation += `💡 십성이 뭐냐고요?\n`;
+    interpretation += `   '나(일간)'를 기준으로 다른 글자들이 어떤 관계인지 보는 거예요.\n`;
+    interpretation += `   마치 인생 드라마의 캐릭터 관계도 같은 느낌! 🎬\n\n`;
+
+    interpretation += `📊 당신의 십성 관계도:\n`;
+    interpretation += `┌─────┬─────┬──────┬─────┐\n`;
+    if (tenGods.hourStemGod) {
+      interpretation += `│${tenGods.hourStemGod.padEnd(4)}│일간(나) │${tenGods.monthStemGod.padEnd(5)}│${tenGods.yearStemGod.padEnd(4)}│ 천간\n`;
+      interpretation += `│${(tenGods.hourBranchGod || '').padEnd(4)}│${tenGods.dayBranchGod.padEnd(5)} │${tenGods.monthBranchGod.padEnd(5)}│${tenGods.yearBranchGod.padEnd(4)}│ 지지\n`;
+    } else {
+      interpretation += `│  -   │일간(나) │${tenGods.monthStemGod.padEnd(5)}│${tenGods.yearStemGod.padEnd(4)}│ 천간\n`;
+      interpretation += `│  -   │${tenGods.dayBranchGod.padEnd(5)} │${tenGods.monthBranchGod.padEnd(5)}│${tenGods.yearBranchGod.padEnd(4)}│ 지지\n`;
+    }
+    interpretation += `├─────┼─────┼──────┼─────┤\n`;
+    interpretation += `│ 시주  │ 일주  │ 월주   │ 년주  │\n`;
+    interpretation += `└─────┴─────┴──────┴─────┘\n\n`;
+
+    // 십성 분포 분석
+    const godCategories = {
+      '비겁(比劫)': (tenGods.godCounts['비견'] || 0) + (tenGods.godCounts['겁재'] || 0),
+      '식상(食傷)': (tenGods.godCounts['식신'] || 0) + (tenGods.godCounts['상관'] || 0),
+      '재성(財星)': (tenGods.godCounts['편재'] || 0) + (tenGods.godCounts['정재'] || 0),
+      '관살(官殺)': (tenGods.godCounts['편관'] || 0) + (tenGods.godCounts['정관'] || 0),
+      '인성(印星)': (tenGods.godCounts['편인'] || 0) + (tenGods.godCounts['정인'] || 0)
+    };
+
+    interpretation += `📈 십성 분포:\n`;
+    Object.entries(godCategories).forEach(([cat, count]) => {
+      const bar = '█'.repeat(count) + '░'.repeat(Math.max(0, 5 - count));
+      interpretation += `   ${cat}: ${bar} ${count}개\n`;
+    });
+    interpretation += `\n`;
+
+    // 가장 많은 십성 카테고리 해석
+    const sortedCats = Object.entries(godCategories).sort((a, b) => b[1] - a[1]);
+    const dominantCat = sortedCats[0];
+    const catInterpretations: Record<string, string> = {
+      '비겁(比劫)': '🤝 비겁이 많아요! 독립심이 강하고 경쟁심이 있습니다. 자수성가형으로 형제나 동료의 도움보다는 스스로 일어서는 타입이에요.',
+      '식상(食傷)': '🎨 식상이 많아요! 표현력과 창의력이 뛰어납니다. 먹복도 있고, 예술적 재능이 있어서 창작이나 서비스업에 유리해요.',
+      '재성(財星)': '💰 재성이 많아요! 재물복이 있고 사업 수완이 좋습니다. 돈을 모으는 능력이 있어요. 다만 너무 돈에 집착하면 건강에 해로울 수 있어요.',
+      '관살(官殺)': '🏛️ 관살이 많아요! 직장운과 명예운이 강합니다. 조직에서 인정받기 쉽고, 책임감이 강해요. 다만 스트레스 관리가 필요해요.',
+      '인성(印星)': '📚 인성이 많아요! 학문과 지식에 재능이 있습니다. 공부를 잘하고, 문서운이 좋아요. 어머니의 덕이 있고, 자격증이나 학위에 유리해요.'
+    };
+    interpretation += `${catInterpretations[dominantCat[0]] || ''}\n\n`;
+
+    // ========== 신강신약 & 격국 & 용신 분석 ==========
+    interpretation += `【 ⚖️ 신강신약 분석 - 나의 에너지 강도! 】\n\n`;
+    interpretation += `💡 신강신약이 뭐냐고요?\n`;
+    interpretation += `   '나(일간)'의 에너지가 강한지 약한지 판단하는 거예요.\n`;
+    interpretation += `   RPG에서 캐릭터 레벨 같은 거죠! 🎮\n\n`;
+
+    const strengthEmoji = strengthAnalysis.isStrong ? '💪' : '🤲';
+    interpretation += `${strengthEmoji} 판정 결과: ${strengthAnalysis.level}\n\n`;
+    interpretation += `📊 에너지 분석:\n`;
+    interpretation += `   도움 에너지(비겁+인성): ${'█'.repeat(strengthAnalysis.helpScore)}${'░'.repeat(Math.max(0, 5 - strengthAnalysis.helpScore))} (${strengthAnalysis.helpScore})\n`;
+    interpretation += `   소모 에너지(식상+재성+관살): ${'█'.repeat(strengthAnalysis.drainScore)}${'░'.repeat(Math.max(0, 5 - strengthAnalysis.drainScore))} (${strengthAnalysis.drainScore})\n\n`;
+    interpretation += `📖 해석:\n${strengthAnalysis.description}\n\n`;
+
+    // 격국
+    interpretation += `🏛️ 격국(格局): ${geokguk.name}\n`;
+    interpretation += `   ${geokguk.description}\n\n`;
+    interpretation += `📖 격국 특성:\n${geokguk.traits}\n\n`;
+
+    // 용신 (개선된 버전)
+    interpretation += `💎 용신(用神): ${elementEmojis[strengthAnalysis.yongshinElement]} ${strengthAnalysis.yongshin}\n`;
+    if (strengthAnalysis.isStrong) {
+      interpretation += `   → 신강하므로 에너지를 분산시켜주는 오행이 용신이에요!\n`;
+      interpretation += `   → 재능을 발휘하고, 사회에 기여하며, 활동적으로 생활하세요!\n\n`;
+    } else {
+      interpretation += `   → 신약하므로 나를 도와주는 오행이 용신이에요!\n`;
+      interpretation += `   → 학습하고, 배우고, 기반을 다지며, 협력자를 찾으세요!\n\n`;
+    }
+    interpretation += `⚠️ 기신(忌神): ${strengthAnalysis.gisin}\n`;
+    interpretation += `   → 이 에너지가 올 때는 조심하세요!\n\n`;
+
+    // ========== 십이운성(十二運星) 분석 ==========
+    interpretation += `【 🔄 십이운성 분석 - 인생 에너지 사이클! 】\n\n`;
+    interpretation += `💡 십이운성이 뭐냐고요?\n`;
+    interpretation += `   각 기둥마다 인생 에너지의 단계를 보여줘요.\n`;
+    interpretation += `   사람의 일생을 12단계로 나눈 것이죠! 🔄\n\n`;
+
+    const yearStageDetail = TWELVE_STAGE_DETAILS[twelveStages.yearStage];
+    const monthStageDetail = TWELVE_STAGE_DETAILS[twelveStages.monthStage];
+    const dayStageDetail = TWELVE_STAGE_DETAILS[twelveStages.dayStage];
+
+    interpretation += `📊 당신의 십이운성:\n\n`;
+    interpretation += `   🗓️ 년주 → ${yearStageDetail.symbol} ${twelveStages.yearStage} (에너지: ${'★'.repeat(yearStageDetail.energy)}${'☆'.repeat(10 - yearStageDetail.energy)})\n`;
+    interpretation += `      ${yearStageDetail.description}\n\n`;
+    interpretation += `   📅 월주 → ${monthStageDetail.symbol} ${twelveStages.monthStage} (에너지: ${'★'.repeat(monthStageDetail.energy)}${'☆'.repeat(10 - monthStageDetail.energy)})\n`;
+    interpretation += `      ${monthStageDetail.description}\n\n`;
+    interpretation += `   🌅 일주 → ${dayStageDetail.symbol} ${twelveStages.dayStage} (에너지: ${'★'.repeat(dayStageDetail.energy)}${'☆'.repeat(10 - dayStageDetail.energy)})\n`;
+    interpretation += `      ${dayStageDetail.description}\n\n`;
+
+    if (twelveStages.hourStage) {
+      const hourStageDetail = TWELVE_STAGE_DETAILS[twelveStages.hourStage];
+      interpretation += `   ⏰ 시주 → ${hourStageDetail.symbol} ${twelveStages.hourStage} (에너지: ${'★'.repeat(hourStageDetail.energy)}${'☆'.repeat(10 - hourStageDetail.energy)})\n`;
+      interpretation += `      ${hourStageDetail.description}\n\n`;
+    }
+
+    interpretation += `   📈 종합 에너지 레벨: ${'🔥'.repeat(Math.ceil(twelveStages.overallEnergy / 2))} (${twelveStages.overallEnergy}/10)\n`;
+    if (twelveStages.overallEnergy >= 8) {
+      interpretation += `   → 에너지가 매우 강해요! 적극적으로 도전하면 좋은 결과를 얻어요! 🚀\n\n`;
+    } else if (twelveStages.overallEnergy >= 5) {
+      interpretation += `   → 안정적인 에너지예요! 꾸준히 노력하면 좋은 성과를 낼 수 있어요! 💪\n\n`;
+    } else {
+      interpretation += `   → 에너지가 약한 편이지만, 잠재력이 축적되는 시기예요! 내면을 다지면 좋아요! 🌱\n\n`;
+    }
+
+    // ========== 신살(神殺) 분석 ==========
+    if (spiritStars.stars.length > 0) {
+      interpretation += `【 ✨ 신살(神殺) 분석 - 특수 효과 아이템! 】\n\n`;
+      interpretation += `💡 신살이 뭐냐고요?\n`;
+      interpretation += `   사주에 붙는 '특수 효과'예요! 게임의 버프/디버프 같은 느낌!\n`;
+      interpretation += `   (단, 신살은 참고사항이지 절대적인 건 아니에요! ☝️)\n\n`;
+
+      const goodStars = spiritStars.stars.filter(s => s.type === 'good');
+      const neutralStars = spiritStars.stars.filter(s => s.type === 'neutral');
+      const badStars = spiritStars.stars.filter(s => s.type === 'bad');
+
+      if (goodStars.length > 0) {
+        interpretation += `✨ 길신(좋은 효과):\n`;
+        goodStars.forEach(s => {
+          interpretation += `   ${s.symbol} ${s.name} [${s.pillar}]\n`;
+          interpretation += `      → ${s.description}\n\n`;
+        });
+      }
+
+      if (neutralStars.length > 0) {
+        interpretation += `🔮 중성 신살:\n`;
+        neutralStars.forEach(s => {
+          interpretation += `   ${s.symbol} ${s.name} [${s.pillar}]\n`;
+          interpretation += `      → ${s.description}\n\n`;
+        });
+      }
+
+      if (badStars.length > 0) {
+        interpretation += `⚠️ 흉신(주의할 효과):\n`;
+        badStars.forEach(s => {
+          interpretation += `   ${s.symbol} ${s.name} [${s.pillar}]\n`;
+          interpretation += `      → ${s.description}\n\n`;
+        });
+      }
+
+      interpretation += `💡 신살은 "양념" 같은 거예요! 메인 요리(사주 전체 구조)가 더 중요해요! 🍳\n\n`;
     }
 
     // ========== 운세별 상세 분석 데이터 ==========
@@ -1256,11 +1876,52 @@ export class SajuService {
       waterCount: reading.waterCount
     };
 
+    // 추가 분석 데이터
+    const tenGods = this.calculateAllTenGods(fourPillars);
+    const strengthAnalysis = this.calculateStrengthWeakness(fourPillars, elementCount);
+    const twelveStages = this.calculateTwelveStages(fourPillars);
+    const spiritStars = this.calculateSpiritStars(fourPillars);
+    const geokguk = this.determineGeokguk(fourPillars, tenGods);
+
     return {
       ...reading,
       fourPillarsDisplay: this.getFourPillarsDisplay(fourPillars),
       elementAnalysis: this.getElementAnalysis(elementCount),
-      zodiacAnimal: EARTHLY_BRANCHES_ANIMALS[EARTHLY_BRANCHES.indexOf(reading.yearBranch)]
+      zodiacAnimal: EARTHLY_BRANCHES_ANIMALS[EARTHLY_BRANCHES.indexOf(reading.yearBranch)],
+      advancedAnalysis: {
+        tenGods: {
+          yearStemGod: tenGods.yearStemGod,
+          yearBranchGod: tenGods.yearBranchGod,
+          monthStemGod: tenGods.monthStemGod,
+          monthBranchGod: tenGods.monthBranchGod,
+          dayBranchGod: tenGods.dayBranchGod,
+          hourStemGod: tenGods.hourStemGod,
+          hourBranchGod: tenGods.hourBranchGod,
+          godCounts: tenGods.godCounts
+        },
+        strength: {
+          level: strengthAnalysis.level,
+          isStrong: strengthAnalysis.isStrong,
+          score: strengthAnalysis.score,
+          description: strengthAnalysis.description,
+          yongshin: strengthAnalysis.yongshin,
+          yongshinElement: strengthAnalysis.yongshinElement,
+          gisin: strengthAnalysis.gisin
+        },
+        twelveStages: {
+          yearStage: twelveStages.yearStage,
+          monthStage: twelveStages.monthStage,
+          dayStage: twelveStages.dayStage,
+          hourStage: twelveStages.hourStage,
+          overallEnergy: twelveStages.overallEnergy
+        },
+        spiritStars: spiritStars.stars,
+        geokguk: {
+          name: geokguk.name,
+          description: geokguk.description,
+          traits: geokguk.traits
+        }
+      }
     };
   }
 
