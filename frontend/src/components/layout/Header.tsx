@@ -31,6 +31,12 @@ const Header = () => {
             <Link to="/tarot/learn" className="text-gray-300 hover:text-accent transition-colors">
               타로학습
             </Link>
+            <Link to="/rag-search" className="text-gray-500 hover:text-neon-cyan transition-colors text-xs border border-mystic-600 px-2 py-0.5 rounded">
+              RAG
+            </Link>
+            <Link to="/saju-graph" className="text-gray-500 hover:text-neon-purple transition-colors text-xs border border-mystic-600 px-2 py-0.5 rounded">
+              그래프
+            </Link>
             {isAuthenticated && (
               <>
                 <Link to="/reading" className="text-gray-300 hover:text-accent transition-colors">
@@ -110,6 +116,20 @@ const Header = () => {
                 onClick={() => setIsMenuOpen(false)}
               >
                 타로학습
+              </Link>
+              <Link
+                to="/rag-search"
+                className="text-gray-500 hover:text-neon-cyan transition-colors text-sm"
+                onClick={() => setIsMenuOpen(false)}
+              >
+                RAG 검색 (개발)
+              </Link>
+              <Link
+                to="/saju-graph"
+                className="text-gray-500 hover:text-neon-purple transition-colors text-sm"
+                onClick={() => setIsMenuOpen(false)}
+              >
+                사주 그래프 인사이트
               </Link>
               {isAuthenticated ? (
                 <>

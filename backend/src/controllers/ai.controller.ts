@@ -16,10 +16,30 @@ const interpretSchema = z.object({
   }))
 });
 
-// Rate limiting을 위한 간단한 in-memory 저장소
-const rateLimitStore: Map<string, { count: number; resetTime: number }> = new Map();
-const RATE_LIMIT = 20; // 시간당 20회
-const WINDOW_MS = 60 * 60 * 1000; // 1시간
+// Rate limiting을 위한 간단한 in-memory 저장소 (saju-ai와 공유)
+export const rateLimitStore: Map<string, { count: number; resetTime: number }> = new Map();
+export const RATE_LIMIT = 20; // 시간당 20회
+export const WINDOW_MS = 60 * 60 * 1000; // 1시간
+
+export function checkRateLimit(userId: string): { allowed: boolean } {
+  const now = Date.now();
+  const userLimit = rateLimitStore.get(userId);
+
+  if (userLimit) {
+    if (now < userLimit.resetTime) {
+      if (userLimit.count >= RATE_LIMIT) {
+        return { allowed: false };
+      }
+      userLimit.count++;
+    } else {
+      rateLimitStore.set(userId, { count: 1, resetTime: now + WINDOW_MS });
+    }
+  } else {
+    rateLimitStore.set(userId, { count: 1, resetTime: now + WINDOW_MS });
+  }
+
+  return { allowed: true };
+}
 
 export class AIController {
   async interpret(req: AuthRequest, res: Response, next: NextFunction) {
@@ -27,26 +47,15 @@ export class AIController {
       const userId = req.user!.userId;
 
       // Rate limiting 체크
-      const now = Date.now();
-      const userLimit = rateLimitStore.get(userId);
-
-      if (userLimit) {
-        if (now < userLimit.resetTime) {
-          if (userLimit.count >= RATE_LIMIT) {
-            return res.status(429).json({
-              success: false,
-              error: {
-                code: 'AI_RATE_LIMIT',
-                message: 'AI 해석 횟수를 초과했습니다. 1시간 후 다시 시도해주세요.'
-              }
-            });
+      const { allowed } = checkRateLimit(userId);
+      if (!allowed) {
+        return res.status(429).json({
+          success: false,
+          error: {
+            code: 'AI_RATE_LIMIT',
+            message: 'AI 해석 횟수를 초과했습니다. 1시간 후 다시 시도해주세요.'
           }
-          userLimit.count++;
-        } else {
-          rateLimitStore.set(userId, { count: 1, resetTime: now + WINDOW_MS });
-        }
-      } else {
-        rateLimitStore.set(userId, { count: 1, resetTime: now + WINDOW_MS });
+        });
       }
 
       const validated = interpretSchema.parse(req.body);

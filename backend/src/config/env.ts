@@ -14,7 +14,11 @@ export const config = {
   // Neo4j Graph Database
   NEO4J_URI: process.env.NEO4J_URI || 'bolt://localhost:7687',
   NEO4J_USER: process.env.NEO4J_USER || 'neo4j',
-  NEO4J_PASSWORD: process.env.NEO4J_PASSWORD || 'taromaster123'
+  NEO4J_PASSWORD: process.env.NEO4J_PASSWORD || 'taromaster123',
+  // Qdrant Vector Database
+  QDRANT_URL: process.env.QDRANT_URL || 'http://localhost:6333',
+  // Gemini Embeddings
+  GEMINI_API_KEY: process.env.GEMINI_API_KEY || ''
 };
 
 // 필수 환경 변수 검증

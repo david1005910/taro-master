@@ -66,9 +66,45 @@ export interface CombinedReadingResult {
   recommendations: string[];
 }
 
+// 충합 분석 결과
+export interface ConflictsAndHarmonies {
+  stemCombinations: Array<{ name: string; element: FiveElement; stems: string[] }>;
+  branchConflicts: Array<{ name: string; branches: string[] }>;
+  tripleHarmonies: Array<{ name: string; element: FiveElement; branches: string[] }>;
+  sixHarmonies: Array<{ name: string; element: FiveElement; branches: string[] }>;
+}
+
+// 그래프 인사이트 결과
+export interface GraphInsightResult {
+  elementBalance: Record<FiveElement, number>;
+  dominantElement: FiveElement;
+  weakElement: FiveElement;
+  conflictsAndHarmonies: ConflictsAndHarmonies;
+  graphCards: Array<{ number: number; suit: string; reason: string; strength: number; path?: string }>;
+  analysis: string;
+  insights: string[];
+}
+
+// 하이브리드 검색 결과
+export interface HybridSearchResult {
+  saju: {
+    analysis: string;
+    elementBalance: Record<FiveElement, number>;
+    dominantElement: FiveElement;
+    weakElement: FiveElement;
+    conflictsAndHarmonies: ConflictsAndHarmonies;
+    insights: string[];
+  };
+  semanticQuery: string;
+  graphCards: Array<{ number: number; suit: string; reason: string; strength: number; path?: string }>;
+  ragCards: Array<{ card: { nameKo: string; nameEn: string; type: string; suit: string | null; number: number; keywords: string[]; uprightMeaning: string }; score: number; rank: number }>;
+  ragAvailable: boolean;
+  neo4jAvailable: boolean;
+}
+
 export const sajuTarotService = {
   // Neo4j 연결 상태 확인
-  async getStatus(): Promise<{ neo4jConnected: boolean; message: string }> {
+  async getStatus(): Promise<{ neo4jConnected: boolean; ragInitialized: boolean; ragCardCount: number; message: string }> {
     const response = await api.get('/saju-tarot/status');
     return response.data.data;
   },
@@ -97,6 +133,36 @@ export const sajuTarotService = {
     tarotCards: Array<{ number: number; suit: string; isReversed: boolean }>
   ): Promise<CombinedReadingResult> {
     const response = await api.post('/saju-tarot/combined-reading', { saju, tarotCards });
+    return response.data.data;
+  },
+
+  // 사주 그래프 종합 인사이트 (천간합/지지충/삼합/육합)
+  async getGraphInsight(saju: SajuInfo): Promise<GraphInsightResult> {
+    const response = await api.post('/saju-tarot/graph-insight', saju);
+    return response.data.data;
+  },
+
+  // Graph + RAG 하이브리드 검색
+  async hybridSearch(saju: SajuInfo, customQuery?: string, limit = 5): Promise<HybridSearchResult> {
+    const response = await api.post('/saju-tarot/hybrid-search', { saju, customQuery, limit });
+    return response.data.data;
+  },
+
+  // 타로 리딩 그래프 분석 (카드 간 관계: 상생/상극/동일오행/연속)
+  async readingAnalysis(cards: Array<{ number: number; suit: string }>): Promise<{
+    elementDistribution: Record<FiveElement, number>;
+    missingElements: FiveElement[];
+    cardRelationships: Array<{
+      from: { number: number; suit: string };
+      to: { number: number; suit: string };
+      type: string;
+      detail: string;
+    }>;
+    majorArcanaPath: Array<{ number: number }>;
+    energyDynamics: { generating: number; depleting: number; balanced: boolean };
+    insights: string[];
+  }> {
+    const response = await api.post('/saju-tarot/reading-analysis', { cards });
     return response.data.data;
   }
 };

@@ -8,7 +8,7 @@ interface TokenPayload {
 
 export const generateAccessToken = (payload: TokenPayload): string => {
   return jwt.sign(payload, config.JWT_SECRET, {
-    expiresIn: config.JWT_EXPIRES_IN
+    expiresIn: config.JWT_EXPIRES_IN as jwt.SignOptions['expiresIn']
   });
 };
 
@@ -16,7 +16,7 @@ export const generateRefreshToken = (payload: TokenPayload): string => {
   return jwt.sign(
     { ...payload, type: 'refresh' },
     config.JWT_SECRET,
-    { expiresIn: config.JWT_REFRESH_EXPIRES_IN }
+    { expiresIn: config.JWT_REFRESH_EXPIRES_IN as jwt.SignOptions['expiresIn'] }
   );
 };
 

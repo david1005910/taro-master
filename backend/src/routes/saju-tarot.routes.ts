@@ -1,13 +1,9 @@
 import { Router } from 'express';
 import { sajuTarotController } from '../controllers/saju-tarot.controller';
-import { authMiddleware } from '../middleware/auth.middleware';
 
 const router = Router();
 
-// 모든 라우트에 인증 미들웨어 적용 (선택적으로 제거 가능)
-// router.use(authMiddleware);
-
-// Neo4j 연결 상태 확인
+// Neo4j + RAG 연결 상태 확인
 router.get('/status', sajuTarotController.getStatus);
 
 // 사주 기반 추천 타로 카드
@@ -21,5 +17,14 @@ router.get('/card/:suit/:number', sajuTarotController.getCardRelations);
 
 // 사주-타로 종합 리딩
 router.post('/combined-reading', sajuTarotController.getCombinedReading);
+
+// 사주 그래프 종합 인사이트 (천간합/지지충/삼합/육합 + 멀티홉 카드 추천)
+router.post('/graph-insight', sajuTarotController.getGraphInsight);
+
+// Graph + RAG 하이브리드 검색
+router.post('/hybrid-search', sajuTarotController.hybridSearch);
+
+// 뽑힌 타로 카드 집합 그래프 분석 (카드 간 관계: 상생/상극/연속/동일오행)
+router.post('/reading-analysis', sajuTarotController.readingAnalysis);
 
 export default router;

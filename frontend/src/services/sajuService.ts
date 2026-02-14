@@ -93,6 +93,20 @@ export interface SajuReadingsResponse {
   };
 }
 
+export interface AISummaryResponse {
+  summary: string;
+  keyPoints: string[];
+  luckyElements: {
+    element: string;
+    reason: string;
+  };
+}
+
+export interface ChatMessage {
+  role: 'user' | 'assistant';
+  content: string;
+}
+
 export const sajuService = {
   // 사주 계산 및 저장
   async createReading(input: SajuInput): Promise<SajuReading> {
@@ -115,6 +129,18 @@ export const sajuService = {
   // 사주 리딩 삭제
   async deleteReading(id: string): Promise<void> {
     await api.delete(`/saju/${id}`);
+  },
+
+  // AI 요약 생성
+  async getAISummary(readingId: string): Promise<AISummaryResponse> {
+    const response = await api.post('/saju/ai/summary', { readingId });
+    return response.data.data;
+  },
+
+  // AI Q&A 질문
+  async askQuestion(readingId: string, question: string, history: ChatMessage[]): Promise<string> {
+    const response = await api.post('/saju/ai/ask', { readingId, question, history });
+    return response.data.data.answer;
   }
 };
 

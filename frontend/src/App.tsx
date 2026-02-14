@@ -20,6 +20,8 @@ import SajuHistory from './pages/SajuHistory';
 import SajuLearn from './pages/SajuLearn';
 import TarotLearn from './pages/TarotLearn';
 import SajuTarotReading from './pages/SajuTarotReading';
+import RagSearch from './pages/RagSearch';
+import SajuGraphInsight from './pages/SajuGraphInsight';
 
 function App() {
   const { checkAuth, token } = useAuthStore();
@@ -100,6 +102,12 @@ function App() {
             <SajuTarotReading />
           </ProtectedRoute>
         } />
+
+        {/* RAG Search (dev/test) */}
+        <Route path="rag-search" element={<RagSearch />} />
+
+        {/* 사주 그래프 인사이트 */}
+        <Route path="saju-graph" element={<SajuGraphInsight />} />
       </Route>
     </Routes>
   );

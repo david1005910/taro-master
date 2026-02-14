@@ -14,7 +14,9 @@
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.24.0",
+    "@google/generative-ai": "^0.24.1",
     "@prisma/client": "^5.10.0",
+    "@qdrant/js-client-rest": "^1.16.2",
     "bcrypt": "^5.1.1",
     "cors": "^2.8.5",
     "dotenv": "^16.4.5",
@@ -25,6 +27,7 @@
     "lunar-javascript": "^1.7.7",
     "morgan": "^1.10.0",
     "neo4j-driver": "^6.0.1",
+    "voyageai": "^0.1.0",
     "zod": "^3.22.4"
   },
   "devDependencies": {

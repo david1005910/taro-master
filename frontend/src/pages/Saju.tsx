@@ -480,14 +480,14 @@ const Saju = () => {
                 { value: 'false', label: '양력' },
                 { value: 'true', label: '음력' }
               ]}
-              value={formData.isLunar.toString()}
+              value={(formData.isLunar ?? false).toString()}
               onChange={(val) => setFormData({ ...formData, isLunar: val })}
             />
 
             {/* 생시 (시진 선택) */}
             <LiquidSelect
               label="생시 (태어난 시간)"
-              value={formData.birthTime}
+              value={formData.birthTime ?? ''}
               onChange={(val) => setFormData({ ...formData, birthTime: val })}
               options={SIJU_OPTIONS}
               hint="시진을 선택하세요"
@@ -502,7 +502,7 @@ const Saju = () => {
                 { value: 'female', label: '여성' },
                 { value: 'unknown', label: '선택 안함' }
               ]}
-              value={formData.gender}
+              value={formData.gender ?? 'unknown'}
               onChange={(val) => setFormData({ ...formData, gender: val })}
             />
 

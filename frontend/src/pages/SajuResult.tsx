@@ -1,7 +1,7 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { motion } from 'framer-motion';
-import { sajuService, SajuReading } from '../services/sajuService';
+import { motion, AnimatePresence } from 'framer-motion';
+import { sajuService, SajuReading, AISummaryResponse, ChatMessage } from '../services/sajuService';
 
 // 오행 색상 (더 생생한 색상으로 업데이트)
 const ELEMENT_COLORS: Record<string, string> = {
@@ -10,15 +10,6 @@ const ELEMENT_COLORS: Record<string, string> = {
   '토(土)': '#eab308',
   '금(金)': '#94a3b8',
   '수(水)': '#3b82f6'
-};
-
-// 오행 그라데이션 색상
-const ELEMENT_GRADIENTS: Record<string, string> = {
-  '목(木)': 'from-green-400 to-emerald-600',
-  '화(火)': 'from-red-400 to-orange-600',
-  '토(土)': 'from-yellow-400 to-amber-600',
-  '금(金)': 'from-slate-300 to-slate-500',
-  '수(水)': 'from-blue-400 to-indigo-600'
 };
 
 // SVG Gooey Filter
@@ -204,12 +195,31 @@ const LiquidButton = ({
   </motion.button>
 );
 
+const SUGGESTED_QUESTIONS = [
+  '올해 연애운은?',
+  '직업 적성은?',
+  '건강 주의사항은?',
+  '재물운 높이는 법은?'
+];
+
 const SajuResult = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [reading, setReading] = useState<SajuReading | null>(null);
+
+  // AI Summary state
+  const [aiSummary, setAiSummary] = useState<AISummaryResponse | null>(null);
+  const [summaryLoading, setSummaryLoading] = useState(false);
+  const [summaryError, setSummaryError] = useState<string | null>(null);
+
+  // Q&A Chat state
+  const [chatOpen, setChatOpen] = useState(false);
+  const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
+  const [chatInput, setChatInput] = useState('');
+  const [chatLoading, setChatLoading] = useState(false);
+  const chatEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const fetchReading = async () => {
@@ -227,6 +237,52 @@ const SajuResult = () => {
 
     fetchReading();
   }, [id]);
+
+  // AI 요약 자동 요청
+  useEffect(() => {
+    if (!reading || !id) return;
+
+    const fetchSummary = async () => {
+      setSummaryLoading(true);
+      setSummaryError(null);
+      try {
+        const data = await sajuService.getAISummary(id);
+        setAiSummary(data);
+      } catch (err: any) {
+        setSummaryError(err.response?.data?.error?.message || 'AI 요약을 불러오는데 실패했습니다.');
+      } finally {
+        setSummaryLoading(false);
+      }
+    };
+
+    fetchSummary();
+  }, [reading, id]);
+
+  // 채팅 스크롤
+  useEffect(() => {
+    chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [chatMessages]);
+
+  const handleAskQuestion = async (question: string) => {
+    if (!id || chatLoading || !question.trim()) return;
+
+    const userMsg: ChatMessage = { role: 'user', content: question.trim() };
+    setChatMessages(prev => [...prev, userMsg]);
+    setChatInput('');
+    setChatLoading(true);
+
+    try {
+      const answer = await sajuService.askQuestion(id, question.trim(), chatMessages);
+      setChatMessages(prev => [...prev, { role: 'assistant', content: answer }]);
+    } catch (err: any) {
+      setChatMessages(prev => [...prev, {
+        role: 'assistant',
+        content: err.response?.data?.error?.message || '답변을 생성하는데 실패했습니다. 다시 시도해주세요.'
+      }]);
+    } finally {
+      setChatLoading(false);
+    }
+  };
 
   if (loading) {
     return (
@@ -552,6 +608,245 @@ const SajuResult = () => {
             </div>
           </GlassCard>
         )}
+
+        {/* AI 요약 섹션 */}
+        <GlassCard className="p-6 md:p-8 mb-8" delay={0.35}>
+          <h2 className="text-2xl font-bold text-center mb-6 bg-gradient-to-r from-white to-white/70 bg-clip-text text-transparent flex items-center justify-center gap-2">
+            <span className="text-2xl">&#x2728;</span> AI 핵심 요약
+          </h2>
+
+          {summaryLoading && (
+            <div className="flex flex-col items-center py-8">
+              <div className="relative w-16 h-16 mb-4">
+                <motion.div
+                  className="absolute inset-0 rounded-full border-2 border-accent/30"
+                  animate={{ rotate: 360 }}
+                  transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
+                />
+                <motion.div
+                  className="absolute inset-1 rounded-full border-2 border-t-accent border-r-transparent border-b-transparent border-l-transparent"
+                  animate={{ rotate: -360 }}
+                  transition={{ duration: 1.5, repeat: Infinity, ease: "linear" }}
+                />
+              </div>
+              <motion.p
+                className="text-white/50 text-sm"
+                animate={{ opacity: [0.4, 1, 0.4] }}
+                transition={{ duration: 2, repeat: Infinity }}
+              >
+                AI가 사주를 분석하고 있습니다...
+              </motion.p>
+            </div>
+          )}
+
+          {summaryError && (
+            <div className="text-center py-6">
+              <p className="text-red-400/80 text-sm mb-3">{summaryError}</p>
+              <motion.button
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+                onClick={() => {
+                  if (!id) return;
+                  setSummaryLoading(true);
+                  setSummaryError(null);
+                  sajuService.getAISummary(id)
+                    .then(setAiSummary)
+                    .catch((err: any) => setSummaryError(err.response?.data?.error?.message || 'AI 요약 실패'))
+                    .finally(() => setSummaryLoading(false));
+                }}
+                className="px-4 py-2 rounded-xl bg-white/10 text-white/70 text-sm border border-white/10 hover:bg-white/20 transition-colors"
+              >
+                다시 시도
+              </motion.button>
+            </div>
+          )}
+
+          {aiSummary && !summaryLoading && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ duration: 0.5 }}
+              className="space-y-6"
+            >
+              {/* 핵심 요약 */}
+              <div className="text-white/80 leading-relaxed text-sm md:text-base bg-white/5 rounded-2xl p-5 border border-white/10">
+                {aiSummary.summary}
+              </div>
+
+              {/* 핵심 포인트 */}
+              <div>
+                <h3 className="text-sm font-bold text-accent/80 mb-3 uppercase tracking-wider">핵심 포인트</h3>
+                <ul className="space-y-2">
+                  {aiSummary.keyPoints.map((point, idx) => (
+                    <motion.li
+                      key={idx}
+                      initial={{ opacity: 0, x: -10 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      transition={{ delay: idx * 0.1 }}
+                      className="flex items-start gap-3 text-white/70 text-sm"
+                    >
+                      <span className="w-1.5 h-1.5 rounded-full bg-accent mt-2 flex-shrink-0" />
+                      <span>{point}</span>
+                    </motion.li>
+                  ))}
+                </ul>
+              </div>
+
+              {/* 행운 요소 */}
+              <motion.div
+                className="bg-gradient-to-r from-accent/10 to-yellow-500/10 rounded-2xl p-5 border border-accent/20"
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.3 }}
+              >
+                <h3 className="text-sm font-bold text-accent mb-2">행운의 오행</h3>
+                <p className="text-white font-medium text-lg mb-1">{aiSummary.luckyElements.element}</p>
+                <p className="text-white/60 text-sm">{aiSummary.luckyElements.reason}</p>
+              </motion.div>
+            </motion.div>
+          )}
+        </GlassCard>
+
+        {/* AI Q&A 채팅 */}
+        <GlassCard className="p-6 md:p-8 mb-8" delay={0.4}>
+          <motion.button
+            onClick={() => setChatOpen(prev => !prev)}
+            className="w-full flex items-center justify-between"
+            whileTap={{ scale: 0.98 }}
+          >
+            <h2 className="text-2xl font-bold bg-gradient-to-r from-white to-white/70 bg-clip-text text-transparent flex items-center gap-2">
+              <span className="text-2xl">&#x1F4AC;</span> AI에게 질문하기
+            </h2>
+            <motion.span
+              className="text-white/50 text-2xl"
+              animate={{ rotate: chatOpen ? 180 : 0 }}
+              transition={{ duration: 0.3 }}
+            >
+              &#x25BE;
+            </motion.span>
+          </motion.button>
+
+          <AnimatePresence>
+            {chatOpen && (
+              <motion.div
+                initial={{ height: 0, opacity: 0 }}
+                animate={{ height: 'auto', opacity: 1 }}
+                exit={{ height: 0, opacity: 0 }}
+                transition={{ duration: 0.3 }}
+                className="overflow-hidden"
+              >
+                <div className="mt-6 space-y-4">
+                  {/* 추천 질문 */}
+                  {chatMessages.length === 0 && (
+                    <div className="flex flex-wrap gap-2">
+                      {SUGGESTED_QUESTIONS.map((q) => (
+                        <motion.button
+                          key={q}
+                          whileHover={{ scale: 1.05 }}
+                          whileTap={{ scale: 0.95 }}
+                          onClick={() => handleAskQuestion(q)}
+                          disabled={chatLoading}
+                          className="px-4 py-2 rounded-full bg-white/10 text-white/70 text-sm border border-white/10 hover:bg-white/20 hover:text-white transition-all disabled:opacity-50"
+                        >
+                          {q}
+                        </motion.button>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* 채팅 메시지 */}
+                  {chatMessages.length > 0 && (
+                    <div className="max-h-80 overflow-y-auto space-y-3 pr-1 scrollbar-thin scrollbar-thumb-white/10">
+                      {chatMessages.map((msg, idx) => (
+                        <motion.div
+                          key={idx}
+                          initial={{ opacity: 0, y: 10 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
+                        >
+                          <div
+                            className={`max-w-[85%] rounded-2xl px-4 py-3 text-sm leading-relaxed ${
+                              msg.role === 'user'
+                                ? 'bg-accent/20 text-white border border-accent/30'
+                                : 'bg-white/10 text-white/80 border border-white/10'
+                            }`}
+                          >
+                            {msg.content}
+                          </div>
+                        </motion.div>
+                      ))}
+
+                      {chatLoading && (
+                        <motion.div
+                          initial={{ opacity: 0 }}
+                          animate={{ opacity: 1 }}
+                          className="flex justify-start"
+                        >
+                          <div className="bg-white/10 rounded-2xl px-4 py-3 border border-white/10">
+                            <motion.div
+                              className="flex gap-1"
+                              animate={{ opacity: [0.3, 1, 0.3] }}
+                              transition={{ duration: 1.5, repeat: Infinity }}
+                            >
+                              <span className="w-2 h-2 rounded-full bg-white/50" />
+                              <span className="w-2 h-2 rounded-full bg-white/50" />
+                              <span className="w-2 h-2 rounded-full bg-white/50" />
+                            </motion.div>
+                          </div>
+                        </motion.div>
+                      )}
+
+                      <div ref={chatEndRef} />
+                    </div>
+                  )}
+
+                  {/* 입력 */}
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      value={chatInput}
+                      onChange={(e) => setChatInput(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' && !e.nativeEvent.isComposing) {
+                          handleAskQuestion(chatInput);
+                        }
+                      }}
+                      placeholder="사주에 대해 궁금한 점을 물어보세요..."
+                      disabled={chatLoading}
+                      className="flex-1 bg-white/10 border border-white/20 rounded-xl px-4 py-3 text-white text-sm placeholder-white/30 focus:outline-none focus:border-accent/50 focus:ring-1 focus:ring-accent/30 transition-colors disabled:opacity-50"
+                    />
+                    <motion.button
+                      whileHover={{ scale: 1.05 }}
+                      whileTap={{ scale: 0.95 }}
+                      onClick={() => handleAskQuestion(chatInput)}
+                      disabled={chatLoading || !chatInput.trim()}
+                      className="px-5 py-3 rounded-xl bg-gradient-to-r from-accent to-yellow-400 text-primary font-bold text-sm disabled:opacity-50 disabled:cursor-not-allowed transition-opacity"
+                    >
+                      전송
+                    </motion.button>
+                  </div>
+
+                  {/* 추천 질문 (대화 중) */}
+                  {chatMessages.length > 0 && !chatLoading && (
+                    <div className="flex flex-wrap gap-2">
+                      {SUGGESTED_QUESTIONS.filter(q => !chatMessages.some(m => m.content === q)).slice(0, 3).map((q) => (
+                        <motion.button
+                          key={q}
+                          whileHover={{ scale: 1.05 }}
+                          whileTap={{ scale: 0.95 }}
+                          onClick={() => handleAskQuestion(q)}
+                          className="px-3 py-1.5 rounded-full bg-white/5 text-white/50 text-xs border border-white/10 hover:bg-white/10 hover:text-white/70 transition-all"
+                        >
+                          {q}
+                        </motion.button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </GlassCard>
 
         {/* 버튼 */}
         <motion.div
