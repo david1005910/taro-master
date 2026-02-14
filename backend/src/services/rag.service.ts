@@ -128,18 +128,24 @@ function buildDocument(card: CardDocument): string {
 
 class TarotRAGService {
   private qdrant: QdrantClient;
-  private embedModel: ReturnType<GoogleGenerativeAI['getGenerativeModel']>;
+  private embedModel: ReturnType<GoogleGenerativeAI['getGenerativeModel']> | null = null;
   private bm25 = new BM25Vectorizer();
   private initialized = false;
   private cardCount = 0;
 
   constructor() {
     this.qdrant = new QdrantClient({ url: config.QDRANT_URL });
-    const genai = new GoogleGenerativeAI(config.GEMINI_API_KEY || '');
-    this.embedModel = genai.getGenerativeModel({ model: 'gemini-embedding-001' });
+    if (config.GEMINI_API_KEY) {
+      const genai = new GoogleGenerativeAI(config.GEMINI_API_KEY);
+      this.embedModel = genai.getGenerativeModel({ model: 'gemini-embedding-001' });
+    }
   }
 
   async initialize(): Promise<void> {
+    if (!this.embedModel) {
+      throw new Error('GEMINI_API_KEY is not configured');
+    }
+
     // Test Qdrant connection
     await this.qdrant.versionInfo();
 
@@ -188,6 +194,7 @@ class TarotRAGService {
 
   async indexAllCards(): Promise<void> {
     if (!this.initialized) throw new Error('Not initialized');
+    if (!this.embedModel) throw new Error('Gemini embed model not initialized');
 
     const info = await this.qdrant.getCollection(COLLECTION_NAME);
     if ((info.points_count ?? 0) >= 78) {
@@ -261,6 +268,7 @@ class TarotRAGService {
   }
 
   private async embedQuery(query: string): Promise<number[]> {
+    if (!this.embedModel) throw new Error('Gemini embed model not initialized');
     let retries = 0;
     while (true) {
       try {

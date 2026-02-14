@@ -14,14 +14,8 @@ import ReadingResult from './pages/ReadingResult';
 import History from './pages/History';
 import DailyCard from './pages/DailyCard';
 import Profile from './pages/Profile';
-import Saju from './pages/Saju';
-import SajuResult from './pages/SajuResult';
-import SajuHistory from './pages/SajuHistory';
-import SajuLearn from './pages/SajuLearn';
 import TarotLearn from './pages/TarotLearn';
-import SajuTarotReading from './pages/SajuTarotReading';
 import RagSearch from './pages/RagSearch';
-import SajuGraphInsight from './pages/SajuGraphInsight';
 
 function App() {
   const { checkAuth, token } = useAuthStore();
@@ -74,40 +68,8 @@ function App() {
           </ProtectedRoute>
         } />
 
-        {/* Saju Routes */}
-        <Route path="saju" element={
-          <ProtectedRoute>
-            <Saju />
-          </ProtectedRoute>
-        } />
-        <Route path="saju/result/:id" element={
-          <ProtectedRoute>
-            <SajuResult />
-          </ProtectedRoute>
-        } />
-        <Route path="saju/history" element={
-          <ProtectedRoute>
-            <SajuHistory />
-          </ProtectedRoute>
-        } />
-        <Route path="saju/learn" element={
-          <ProtectedRoute>
-            <SajuLearn />
-          </ProtectedRoute>
-        } />
-
-        {/* Saju-Tarot Integration */}
-        <Route path="saju-tarot" element={
-          <ProtectedRoute>
-            <SajuTarotReading />
-          </ProtectedRoute>
-        } />
-
         {/* RAG Search (dev/test) */}
         <Route path="rag-search" element={<RagSearch />} />
-
-        {/* 사주 그래프 인사이트 */}
-        <Route path="saju-graph" element={<SajuGraphInsight />} />
       </Route>
     </Routes>
   );

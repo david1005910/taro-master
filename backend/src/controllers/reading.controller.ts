@@ -54,8 +54,7 @@ export class ReadingController {
           const aiResult = await aiService.interpretWithRAG({
             spreadType: spread.name,
             question: validated.question,
-            cards: cardsWithDetails,
-            userId
+            cards: cardsWithDetails
           });
 
           // 구조화된 해석 저장 (섹션 구분자 사용)
