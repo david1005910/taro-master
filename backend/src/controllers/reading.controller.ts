@@ -41,6 +41,8 @@ export class ReadingController {
               return {
                 nameKo: card.nameKo,
                 nameEn: card.nameEn,
+                number: card.number,
+                suit: card.suit,
                 position: pos.name,
                 positionDescription: pos.description,
                 isReversed: c.isReversed,
@@ -49,10 +51,11 @@ export class ReadingController {
             })
           );
 
-          const aiResult = await aiService.interpret({
+          const aiResult = await aiService.interpretWithRAG({
             spreadType: spread.name,
             question: validated.question,
-            cards: cardsWithDetails
+            cards: cardsWithDetails,
+            userId
           });
 
           // 구조화된 해석 저장 (섹션 구분자 사용)
