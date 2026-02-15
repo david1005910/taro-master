@@ -298,13 +298,46 @@ const ReadingResult = () => {
           className="glass rounded-xl p-6 mb-6 border-2 border-neon-cyan/50"
           style={{ boxShadow: '0 0 20px rgba(0, 240, 255, 0.2)' }}
         >
-          <div className="flex items-center gap-2 mb-4">
+          <div className="flex items-center gap-2 mb-5">
             <span className="text-2xl">🔮</span>
-            <h2 className="text-xl font-semibold text-neon-cyan">최종 결론 및 조언</h2>
+            <h2 className="text-xl font-semibold text-neon-cyan">종합 조언</h2>
           </div>
-          <p className="text-white leading-relaxed text-lg">
-            {parsedInterpretation.conclusion}
-          </p>
+          {/* 4파트 구조 파싱 — 🔮/✨/⚠️/💌 이모지로 단락 구분 */}
+          <div className="space-y-4">
+            {parsedInterpretation.conclusion
+              .split(/\n\n+/)
+              .filter(p => p.trim())
+              .map((para, i) => {
+                const trimmed = para.trim();
+                const isCoreMsg   = trimmed.startsWith('🔮');
+                const isAction    = trimmed.startsWith('✨');
+                const isWarning   = trimmed.startsWith('⚠️');
+                const isEncourage = trimmed.startsWith('💌');
+                return (
+                  <div
+                    key={i}
+                    className={`rounded-lg px-4 py-3 ${
+                      isCoreMsg   ? 'bg-neon-cyan/10 border border-neon-cyan/30' :
+                      isAction    ? 'bg-neon-purple/10 border border-neon-purple/30' :
+                      isWarning   ? 'bg-red-500/10 border border-red-500/20' :
+                      isEncourage ? 'bg-neon-pink/10 border border-neon-pink/30' :
+                      'bg-white/5'
+                    }`}
+                  >
+                    <p className={`leading-relaxed whitespace-pre-line ${
+                      isCoreMsg   ? 'text-white text-base font-medium' :
+                      isAction    ? 'text-gray-100 text-sm' :
+                      isWarning   ? 'text-red-300 text-sm' :
+                      isEncourage ? 'text-neon-pink text-sm italic' :
+                      'text-gray-200 text-sm'
+                    }`}>
+                      {trimmed}
+                    </p>
+                  </div>
+                );
+              })
+            }
+          </div>
         </motion.div>
       )}
 
