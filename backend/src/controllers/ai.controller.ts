@@ -1,6 +1,7 @@
 import { Response, NextFunction } from 'express';
 import { AuthRequest } from '../middleware/auth.middleware';
 import { aiService } from '../services/ai.service';
+import { readingService } from '../services/reading.service';
 import { z } from 'zod';
 
 const interpretSchema = z.object({
@@ -14,6 +15,15 @@ const interpretSchema = z.object({
     isReversed: z.boolean(),
     keywords: z.array(z.string())
   }))
+});
+
+const chatSchema = z.object({
+  readingId: z.string(),
+  message: z.string().min(1).max(500),
+  history: z.array(z.object({
+    role: z.enum(['user', 'assistant']),
+    content: z.string()
+  })).optional()
 });
 
 // Rate limiting을 위한 간단한 in-memory 저장소 (saju-ai와 공유)
@@ -78,6 +88,64 @@ export class AIController {
             code: 'VALIDATION_ERROR',
             message: error.errors[0].message
           }
+        });
+      }
+      next(error);
+    }
+  }
+
+  async chat(req: AuthRequest, res: Response, next: NextFunction) {
+    try {
+      const userId = req.user!.userId;
+
+      const { allowed } = checkRateLimit(userId);
+      if (!allowed) {
+        return res.status(429).json({
+          success: false,
+          error: { code: 'AI_RATE_LIMIT', message: 'AI 요청 횟수를 초과했습니다. 1시간 후 다시 시도해주세요.' }
+        });
+      }
+
+      const validated = chatSchema.parse(req.body);
+
+      // 리딩 데이터 로드
+      const reading = await readingService.getReadingById(validated.readingId, userId);
+
+      // 카드 정보 구성
+      const cards = reading.cards.map((rc: any) => ({
+        nameKo: rc.card.nameKo,
+        nameEn: rc.card.nameEn,
+        number: rc.card.number,
+        suit: rc.card.suit,
+        position: rc.positionName,
+        positionDescription: rc.positionDescription,
+        isReversed: rc.isReversed,
+        keywords: rc.card.keywords as string[]
+      }));
+
+      const result = await aiService.chat({
+        readingContext: {
+          spreadType: reading.spreadName,
+          question: reading.question ?? undefined,
+          cards,
+          existingInterpretation: reading.interpretation ?? undefined
+        },
+        message: validated.message,
+        history: validated.history
+      });
+
+      res.json({ success: true, data: result });
+    } catch (error: any) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({
+          success: false,
+          error: { code: 'VALIDATION_ERROR', message: error.errors[0].message }
+        });
+      }
+      if (error.code === 'READING_NOT_FOUND') {
+        return res.status(404).json({
+          success: false,
+          error: { code: 'READING_NOT_FOUND', message: '리딩을 찾을 수 없습니다.' }
         });
       }
       next(error);

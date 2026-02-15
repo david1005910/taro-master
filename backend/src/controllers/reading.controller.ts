@@ -4,6 +4,7 @@ import { readingService } from '../services/reading.service';
 import { aiService } from '../services/ai.service';
 import { cardService } from '../services/card.service';
 import { spreadService } from '../services/spread.service';
+import { neo4jGraphService } from '../services/neo4j.service';
 import { z } from 'zod';
 
 const createReadingSchema = z.object({
@@ -86,6 +87,19 @@ ${aiResult.conclusion || '카드의 메시지를 마음에 새기고 앞으로 �
         interpretation,
         cardInterpretations
       });
+
+      // Neo4j 그래프 동기화 (fire-and-forget)
+      if (neo4jGraphService.isReady()) {
+        neo4jGraphService.syncReadingToGraph({
+          userId,
+          readingId: result.id,
+          spreadName: result.spreadName,
+          question: validated.question,
+          cards: validated.cards
+        }).catch((e: any) =>
+          console.warn('[Neo4j] sync 실패 (무시):', e.message)
+        );
+      }
 
       res.status(201).json({
         success: true,

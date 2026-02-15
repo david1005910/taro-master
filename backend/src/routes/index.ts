@@ -7,6 +7,7 @@ import aiRoutes from './ai.routes';
 import progressRoutes from './progress.routes';
 import userRoutes from './user.routes';
 import ragRoutes from './rag.routes';
+import graphRoutes from './graph.routes';
 
 const router = Router();
 
@@ -18,5 +19,6 @@ router.use('/ai', aiRoutes);
 router.use('/progress', progressRoutes);
 router.use('/users', userRoutes);
 router.use('/rag', ragRoutes);
+router.use('/graph', graphRoutes);
 
 export default router;

@@ -42,6 +42,9 @@ const Header = () => {
                 <Link to="/history" className="text-gray-300 hover:text-accent transition-colors">
                   리딩 기록
                 </Link>
+                <Link to="/graph" className="text-gray-300 hover:text-accent transition-colors">
+                  그래프
+                </Link>
               </>
             )}
           </nav>
@@ -124,6 +127,13 @@ const Header = () => {
                     onClick={() => setIsMenuOpen(false)}
                   >
                     리딩 기록
+                  </Link>
+                  <Link
+                    to="/graph"
+                    className="text-gray-300 hover:text-accent transition-colors"
+                    onClick={() => setIsMenuOpen(false)}
+                  >
+                    그래프 탐험
                   </Link>
                   <Link
                     to="/profile"

@@ -1,6 +1,7 @@
 import Anthropic from '@anthropic-ai/sdk';
 import { config } from '../config/env';
 import { ragService } from './rag.service';
+import { neo4jGraphService } from './neo4j.service';
 
 // API 키가 설정되지 않은 경우 null로 설정
 const client = config.CLAUDE_API_KEY && config.CLAUDE_API_KEY !== 'your-claude-api-key-here'
@@ -117,13 +118,14 @@ export class AIService {
       };
     }
 
-    // 병렬로 RAG 컨텍스트 수집
-    const [ragCardContexts, questionRagCards] = await Promise.all([
+    // 병렬로 RAG + 그래프 컨텍스트 수집
+    const [ragCardContexts, questionRagCards, graphContext] = await Promise.all([
       this.fetchCardRAGContexts(request.cards),
-      this.fetchQuestionRAGCards(request.question)
+      this.fetchQuestionRAGCards(request.question),
+      this.fetchGraphContext(request.cards)
     ]);
 
-    const userPrompt = this.buildRAGUserPrompt(request, ragCardContexts, questionRagCards);
+    const userPrompt = this.buildRAGUserPrompt(request, ragCardContexts, questionRagCards, graphContext);
 
     try {
       const response = await client.messages.create({
@@ -193,6 +195,26 @@ export class AIService {
     return results;
   }
 
+  // Neo4j 그래프 컨텍스트 수집
+  private async fetchGraphContext(cards: CardInput[]): Promise<string | null> {
+    if (!neo4jGraphService.isReady()) return null;
+    try {
+      const cardIds = neo4jGraphService.resolveCardIds(cards);
+      if (cardIds.length < 2) return null;
+      const ctx = await neo4jGraphService.buildGraphContext(cardIds);
+      if (!ctx) return null;
+      const lines = [
+        ctx.narrativeHint,
+        ...ctx.sharedElements,
+        ...ctx.numerologicalLinks,
+        ...ctx.archetypeLinks
+      ].filter(Boolean);
+      return lines.length > 0 ? lines.map(l => `• ${l}`).join('\n') : null;
+    } catch {
+      return null;
+    }
+  }
+
   // 질문을 벡터 검색하여 관련 카드 컨텍스트 조회
   private async fetchQuestionRAGCards(question?: string): Promise<string | null> {
     if (!question || !ragService.isInitialized()) return null;
@@ -238,7 +260,8 @@ export class AIService {
   private buildRAGUserPrompt(
     request: InterpretRequest,
     ragContexts: Array<{ card: CardInput; ragDoc: string | null }>,
-    questionCards: string | null
+    questionCards: string | null,
+    graphContext: string | null = null
   ): string {
     const sections: string[] = [];
 
@@ -256,6 +279,12 @@ export class AIService {
       }
     });
 
+    if (graphContext) {
+      sections.push('');
+      sections.push('=== 카드 간 그래프 관계 컨텍스트 ===');
+      sections.push(graphContext);
+    }
+
     if (questionCards) {
       sections.push('');
       sections.push('=== 질문과 의미적으로 관련된 카드 참조 ===');
@@ -263,9 +292,96 @@ export class AIService {
     }
 
     sections.push('');
-    sections.push('위 카드들의 RAG 상세 정보를 적극 반영하여 종합적으로 해석해 주세요.');
+    sections.push('위 카드들의 RAG 상세 정보와 그래프 관계를 적극 반영하여 종합적으로 해석해 주세요.');
 
     return sections.join('\n');
+  }
+
+  // 챗봇 후속 질문 처리
+  async chat(request: ChatRequest): Promise<ChatResponse> {
+    if (!client) {
+      throw {
+        status: 503,
+        code: 'AI_SERVICE_NOT_CONFIGURED',
+        message: 'AI 서비스가 설정되지 않았습니다.'
+      };
+    }
+
+    // 병렬로 RAG + 그래프 컨텍스트 수집
+    const [questionRagCards, graphContext] = await Promise.all([
+      this.fetchQuestionRAGCards(request.message),
+      this.fetchGraphContext(request.readingContext.cards)
+    ]);
+
+    // 시스템 프롬프트: 리딩 컨텍스트를 알고 있는 타로 상담사
+    const contextLines: string[] = [
+      `스프레드: ${request.readingContext.spreadType}`,
+      request.readingContext.question
+        ? `원래 질문: ${request.readingContext.question}`
+        : '원래 질문: 일반적인 조언',
+      '',
+      '뽑힌 카드:',
+      ...request.readingContext.cards.map((c, i) =>
+        `  ${i + 1}. ${c.position}: ${c.nameKo} (${c.isReversed ? '역방향' : '정방향'})`
+      )
+    ];
+
+    if (request.readingContext.existingInterpretation) {
+      contextLines.push('', '기존 해석 요약:', request.readingContext.existingInterpretation.slice(0, 300));
+    }
+    if (graphContext) {
+      contextLines.push('', '카드 관계 컨텍스트:', graphContext);
+    }
+    if (questionRagCards) {
+      contextLines.push('', '관련 카드 참조:', questionRagCards);
+    }
+
+    const systemPrompt = `당신은 친근하고 통찰력 있는 타로 상담사입니다.
+현재 진행 중인 타로 리딩의 컨텍스트를 바탕으로 사용자의 후속 질문에 대화체로 답변합니다.
+
+=== 현재 리딩 컨텍스트 ===
+${contextLines.join('\n')}
+
+대화 원칙:
+1. 친근하고 따뜻한 말투로 답변 (존댓말)
+2. 뽑힌 카드와 리딩 맥락을 반드시 참조
+3. 구체적이고 실용적인 조언 포함
+4. 100-300자 내외로 간결하게 답변
+5. 한국어로 응답`;
+
+    const messages: Anthropic.Messages.MessageParam[] = [
+      ...(request.history ?? []).map(m => ({
+        role: m.role as 'user' | 'assistant',
+        content: m.content
+      })),
+      { role: 'user', content: request.message }
+    ];
+
+    try {
+      const response = await client.messages.create({
+        model: 'claude-sonnet-4-20250514',
+        max_tokens: 1000,
+        system: systemPrompt,
+        messages
+      });
+
+      const content = response.content[0];
+      if (content.type !== 'text') {
+        throw new Error('Unexpected response type');
+      }
+
+      return { reply: content.text };
+    } catch (error: any) {
+      console.error('[AI Service] Chat error:', error.message || error);
+      if (error.status === 401) {
+        throw { status: 503, code: 'AI_SERVICE_AUTH_ERROR', message: 'AI API 인증에 실패했습니다.' };
+      }
+      if (error.status === 429) {
+        throw { status: 503, code: 'AI_SERVICE_RATE_LIMIT', message: 'AI 서비스 요청 한도를 초과했습니다.' };
+      }
+      if (error.code) throw error;
+      throw { status: 500, code: 'AI_CHAT_FAILED', message: 'AI 채팅에 실패했습니다.' };
+    }
   }
 
   private buildUserPrompt(request: InterpretRequest): string {
@@ -285,6 +401,27 @@ ${cardsDescription}
 
 위 카드들을 종합적으로 해석해 주세요.`;
   }
+}
+
+export interface ChatMessage {
+  role: 'user' | 'assistant';
+  content: string;
+}
+
+export interface ChatRequest {
+  readingContext: {
+    spreadType: string;
+    question?: string;
+    cards: CardInput[];
+    existingInterpretation?: string;
+  };
+  message: string;
+  history?: ChatMessage[];
+}
+
+export interface ChatResponse {
+  reply: string;
+  relatedCards?: string[];
 }
 
 export const aiService = new AIService();

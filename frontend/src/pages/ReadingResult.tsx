@@ -1,11 +1,17 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { readingService } from '../services/readingService';
+import api from '../services/api';
 import { Reading } from '../types';
 import TarotCard from '../components/tarot/TarotCard';
 import Loading from '../components/common/Loading';
 import Button from '../components/common/Button';
+
+interface ChatMessage {
+  role: 'user' | 'assistant';
+  content: string;
+}
 
 // 해석 파싱 유틸리티
 interface ParsedInterpretation {
@@ -51,6 +57,12 @@ const ReadingResult = () => {
   const [note, setNote] = useState('');
   const [isSaving, setIsSaving] = useState(false);
 
+  // 채팅 상태
+  const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
+  const [chatInput, setChatInput] = useState('');
+  const [isChatLoading, setIsChatLoading] = useState(false);
+  const chatEndRef = useRef<HTMLDivElement>(null);
+
   useEffect(() => {
     loadReading();
   }, [id]);
@@ -77,6 +89,30 @@ const ReadingResult = () => {
       console.error('Failed to save note:', error);
     } finally {
       setIsSaving(false);
+    }
+  };
+
+  const handleSendChat = async () => {
+    if (!chatInput.trim() || !id || isChatLoading) return;
+    const userMsg: ChatMessage = { role: 'user', content: chatInput.trim() };
+    const newHistory = [...chatMessages, userMsg];
+    setChatMessages(newHistory);
+    setChatInput('');
+    setIsChatLoading(true);
+    try {
+      const { data } = await api.post('/ai/chat', {
+        readingId: id,
+        message: userMsg.content,
+        history: chatMessages.slice(-8)
+      });
+      const reply: ChatMessage = { role: 'assistant', content: data.data.reply };
+      setChatMessages([...newHistory, reply]);
+      setTimeout(() => chatEndRef.current?.scrollIntoView({ behavior: 'smooth' }), 100);
+    } catch (err: any) {
+      const errMsg = err?.response?.data?.error?.message ?? 'AI 응답 중 오류가 발생했습니다.';
+      setChatMessages([...newHistory, { role: 'assistant', content: errMsg }]);
+    } finally {
+      setIsChatLoading(false);
     }
   };
 
@@ -271,6 +307,80 @@ const ReadingResult = () => {
           메모 저장
         </Button>
       </motion.div>
+
+      {/* Chat Interface */}
+      {reading.interpretMode === 'AI' && (
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.4 }}
+          className="glass rounded-xl p-6 mb-8"
+        >
+          <div className="flex items-center gap-2 mb-4">
+            <span className="text-2xl">💬</span>
+            <h2 className="text-xl font-semibold text-neon-cyan">타로 상담사에게 질문하기</h2>
+          </div>
+          <p className="text-gray-400 text-sm mb-4">
+            이 리딩에 대해 궁금한 점을 자유롭게 질문하세요. 뽑힌 카드를 기반으로 답변합니다.
+          </p>
+
+          {/* Message List */}
+          {chatMessages.length > 0 && (
+            <div className="space-y-3 mb-4 max-h-80 overflow-y-auto pr-1">
+              {chatMessages.map((msg, i) => (
+                <div
+                  key={i}
+                  className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
+                >
+                  <div
+                    className={`max-w-[80%] rounded-xl px-4 py-2 text-sm leading-relaxed ${
+                      msg.role === 'user'
+                        ? 'bg-neon-pink/20 border border-neon-pink/30 text-white'
+                        : 'bg-neon-purple/20 border border-neon-purple/30 text-gray-200'
+                    }`}
+                  >
+                    {msg.role === 'assistant' && (
+                      <span className="text-neon-cyan text-xs font-semibold block mb-1">🔮 타로 상담사</span>
+                    )}
+                    <p className="whitespace-pre-wrap">{msg.content}</p>
+                  </div>
+                </div>
+              ))}
+              {isChatLoading && (
+                <div className="flex justify-start">
+                  <div className="bg-neon-purple/20 border border-neon-purple/30 rounded-xl px-4 py-2 text-sm">
+                    <span className="text-neon-cyan text-xs font-semibold block mb-1">🔮 타로 상담사</span>
+                    <span className="text-gray-400 animate-pulse">답변을 준비하고 있습니다...</span>
+                  </div>
+                </div>
+              )}
+              <div ref={chatEndRef} />
+            </div>
+          )}
+
+          {/* Input Area */}
+          <div className="flex gap-2">
+            <input
+              type="text"
+              value={chatInput}
+              onChange={(e) => setChatInput(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && !e.shiftKey && handleSendChat()}
+              placeholder="이 카드들이 말하는 것이 무엇인지 더 자세히 알고 싶어요..."
+              disabled={isChatLoading}
+              className="input-mystic flex-1 text-sm"
+            />
+            <Button
+              onClick={handleSendChat}
+              isLoading={isChatLoading}
+              disabled={!chatInput.trim() || isChatLoading}
+              variant="primary"
+              size="sm"
+            >
+              전송
+            </Button>
+          </div>
+        </motion.div>
+      )}
 
       {/* Actions */}
       <div className="flex justify-center gap-4">

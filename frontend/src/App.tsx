@@ -16,6 +16,7 @@ import DailyCard from './pages/DailyCard';
 import Profile from './pages/Profile';
 import TarotLearn from './pages/TarotLearn';
 import RagSearch from './pages/RagSearch';
+import GraphExplorer from './pages/GraphExplorer';
 
 function App() {
   const { checkAuth, token } = useAuthStore();
@@ -70,6 +71,13 @@ function App() {
 
         {/* RAG Search (dev/test) */}
         <Route path="rag-search" element={<RagSearch />} />
+
+        {/* Graph Explorer (인증 필요) */}
+        <Route path="graph" element={
+          <ProtectedRoute>
+            <GraphExplorer />
+          </ProtectedRoute>
+        } />
       </Route>
     </Routes>
   );
