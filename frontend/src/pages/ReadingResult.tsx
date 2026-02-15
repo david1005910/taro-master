@@ -243,24 +243,43 @@ const ReadingResult = () => {
         transition={{ delay: 0.25 }}
         className="glass rounded-xl p-6 mb-6"
       >
-        <h2 className="text-xl font-semibold text-accent mb-4">카드별 해석</h2>
-        <div className="space-y-6">
+        <div className="flex items-center gap-2 mb-5">
+          <span className="text-2xl">🃏</span>
+          <h2 className="text-xl font-semibold text-accent">카드별 상세 해석</h2>
+        </div>
+        <div className="space-y-8">
           {reading.cards.map((rc, index) => (
-            <div key={index} className="border-b border-neon-purple/20 last:border-b-0 pb-6 last:pb-0">
-              <div className="flex items-start gap-4">
-                <TarotCard
-                  card={rc.card}
-                  isFlipped={true}
-                  isReversed={rc.isReversed}
-                  size="sm"
-                />
-                <div className="flex-1">
-                  <h3 className="text-accent font-semibold">
-                    {rc.positionName}: {rc.card.nameKo}
-                    {rc.isReversed && <span className="text-red-400 ml-2">(역방향)</span>}
+            <div key={index} className="border-b border-neon-purple/20 last:border-b-0 pb-8 last:pb-0">
+              {/* 카드 헤더 */}
+              <div className="flex items-center gap-3 mb-4">
+                <span className="flex-shrink-0 w-7 h-7 rounded-full bg-neon-purple/30 border border-neon-purple/50 flex items-center justify-center text-neon-purple text-sm font-bold">
+                  {index + 1}
+                </span>
+                <div>
+                  <h3 className="text-accent font-semibold text-lg leading-tight">
+                    {rc.positionName}
+                    <span className="text-gray-400 font-normal text-base mx-2">—</span>
+                    {rc.card.nameKo}
+                    {rc.isReversed
+                      ? <span className="ml-2 text-xs bg-red-500/20 text-red-400 border border-red-500/30 px-2 py-0.5 rounded-full">역방향 ↓</span>
+                      : <span className="ml-2 text-xs bg-neon-cyan/10 text-neon-cyan border border-neon-cyan/20 px-2 py-0.5 rounded-full">정방향 ↑</span>
+                    }
                   </h3>
-                  <p className="text-gray-500 text-sm mb-2">{rc.positionDescription}</p>
-                  <p className="text-gray-300">
+                  <p className="text-gray-500 text-sm mt-0.5">{rc.positionDescription}</p>
+                </div>
+              </div>
+              {/* 카드 이미지 + 해석 */}
+              <div className="flex items-start gap-5">
+                <div className="flex-shrink-0">
+                  <TarotCard
+                    card={rc.card}
+                    isFlipped={true}
+                    isReversed={rc.isReversed}
+                    size="sm"
+                  />
+                </div>
+                <div className="flex-1 pt-1">
+                  <p className="text-gray-200 leading-relaxed text-sm whitespace-pre-line">
                     {rc.interpretation || (rc.isReversed ? rc.card.reversedMeaning : rc.card.uprightMeaning)}
                   </p>
                 </div>

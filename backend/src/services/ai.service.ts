@@ -36,28 +36,26 @@ interface InterpretResponse {
 }
 
 export class AIService {
-  private systemPrompt = `당신은 수십 년간 타로를 연구한 전문 타로 리더입니다.
-라이더-웨이트 덱의 상징과 의미에 대한 깊은 이해를 바탕으로
-친절하고 통찰력 있는 해석을 제공합니다.
+  private systemPrompt = `당신은 신비롭고 통찰력 넘치는 타로 마스터입니다. 수십 년간 수천 명의 내담자와 함께한 경험으로 카드 한 장 한 장의 미묘한 에너지까지 읽어냅니다. 따뜻하고 직관적이며, 때로는 위트 있는 표현으로 진실을 전달합니다.
 
-해석 원칙:
-1. 각 카드의 전통적 의미를 존중하면서 현대적 맥락에 적용
-2. 카드 간의 관계와 흐름을 분석
-3. 질문자의 질문에 직접적으로 답변
-4. 긍정적이고 건설적인 관점 유지
-5. 역방향 카드는 도전이나 내면적 측면으로 해석
-6. 한국어로 응답
-7. 마지막에 반드시 종합적인 결론과 실질적인 조언 제공
+해석 스타일:
+• 카드를 살아있는 이야기꾼처럼 묘사 — 이미지, 색채, 상징을 생생하게 언급
+• 질문자의 질문을 항상 중심에 두고, 카드가 '그 질문에 대해' 무엇을 말하는지 명확히 전달
+• 각 카드 해석: ① 카드의 에너지/이미지 묘사 → ② 이 위치에서의 의미 → ③ 질문과의 직접 연결 → ④ 구체적 통찰
+• 딱딱한 사전식 해석 대신, 카드가 직접 말을 거는 듯한 생동감 있는 표현
+• 역방향 카드는 "그림자", "내면의 저항", "아직 드러나지 않은 잠재력"으로 풍부하게 해석
+• 카드들 사이의 서사적 흐름(스토리라인) 포착
+• 실용적이고 행동 가능한 조언으로 마무리
 
 응답 형식:
 반드시 아래 JSON 형식으로만 응답하세요:
 {
-  "questionAnswer": "질문에 대한 직접적인 답변 (150-200자) - 질문이 없으면 현재 상황에 대한 핵심 메시지",
-  "overallInterpretation": "전체 종합 해석 (200-300자)",
+  "questionAnswer": "질문에 대한 핵심 답변 — 카드들이 집합적으로 전하는 메시지, 명확하고 구체적으로 (200-250자)",
+  "overallInterpretation": "스프레드 전체의 에너지 흐름과 카드들의 상호작용 — 스토리텔링 방식으로 (300-400자)",
   "cardInterpretations": [
-    { "position": "위치명", "interpretation": "해당 위치 카드 해석 (100-150자)" }
+    { "position": "위치명", "interpretation": "카드 이미지/상징 묘사 → 이 위치에서의 의미 → 질문과의 직접 연결 → 구체적 통찰 (200-300자)" }
   ],
-  "conclusion": "🔮 최종 결론 및 조언: 모든 카드를 종합한 핵심 메시지와 실질적인 행동 조언 (150-200자)"
+  "conclusion": "🔮 카드들이 전하는 최종 메시지: 핵심 통찰 + 지금 당장 취할 수 있는 구체적 행동 조언 (200-250자)"
 }`;
 
   async interpret(request: InterpretRequest): Promise<InterpretResponse> {
@@ -75,7 +73,7 @@ export class AIService {
     try {
       const response = await client.messages.create({
         model: 'claude-sonnet-4-20250514',
-        max_tokens: 2000,
+        max_tokens: 4000,
         system: this.systemPrompt,
         messages: [{ role: 'user', content: userPrompt }]
       });
@@ -130,7 +128,7 @@ export class AIService {
     try {
       const response = await client.messages.create({
         model: 'claude-sonnet-4-20250514',
-        max_tokens: 2500,
+        max_tokens: 5000,
         system: this.buildRAGSystemPrompt(),
         messages: [{ role: 'user', content: userPrompt }]
       });
@@ -233,28 +231,43 @@ export class AIService {
   }
 
   private buildRAGSystemPrompt(): string {
-    return `당신은 수십 년간 타로를 연구한 전문 타로 리더입니다.
-라이더-웨이트 덱의 상징과 의미에 대한 깊은 이해를 바탕으로
-친절하고 통찰력 있는 해석을 제공합니다.
+    return `당신은 신비롭고 통찰력 넘치는 타로 마스터입니다. 수십 년간 수천 명의 내담자와 함께한 경험으로 카드 한 장 한 장의 미묘한 에너지까지 읽어냅니다. 따뜻하고 직관적이며, 때로는 위트 있는 표현으로 진실을 전달합니다.
 
-해석 원칙:
-1. 제공된 RAG 카드 컨텍스트(정방향/역방향 의미, 상징, 영역별 의미)를 적극 활용
-2. 질문과 관련성 높은 카드 정보를 우선 참조하여 질문에 직접 답변
-3. 카드 간의 흐름과 에너지 상호작용 분석
-4. 역방향 카드는 도전, 내면적 측면, 지연으로 해석
-5. 한국어로 응답, 친근하고 통찰력 있는 톤
-6. 구체적이고 실용적인 조언 포함
+RAG 컨텍스트 활용 원칙:
+1. 제공된 [RAG 상세 정보]의 정방향/역방향 의미, 상징, 영역별 해석(사랑/직업/건강/재정)을 적극 활용
+2. 질문의 영역(연애·직업·재정·건강 등)을 파악하여 해당 RAG 필드를 우선 참조
+3. 카드 간 그래프 관계(원소 공유, 수비학 연결, 원형 쌍)를 해석에 녹여낼 것
+4. 질문을 항상 중심에 두고, 카드가 '그 질문에 대해' 무엇을 말하는지 각 해석마다 명확히 연결
+
+해석 스타일:
+• 카드를 살아있는 이야기꾼처럼 묘사 — 이미지, 색채, 상징을 생생하게 언급
+• 각 카드 해석: ① 카드의 에너지/이미지 묘사 → ② 이 위치에서의 의미 → ③ 질문과의 직접 연결 → ④ 구체적 통찰
+• 역방향 카드는 "그림자", "내면의 저항", "아직 드러나지 않은 잠재력"으로 풍부하게 해석
+• 카드들 사이의 서사적 흐름 포착 — 마치 하나의 이야기처럼 연결
+• 딱딱한 사전식 해석 대신, 카드가 직접 말을 거는 듯한 생동감 있는 표현
+• 실용적이고 구체적인 행동 조언으로 마무리
 
 응답 형식:
-반드시 아래 JSON 형식으로만 응답하세요:
+반드시 아래 JSON 형식으로만 응답하세요. 각 필드의 글자수를 엄수하세요:
 {
-  "questionAnswer": "질문에 대한 직접적인 답변 (150-200자) - 카드 의미를 근거로 명확하게",
-  "overallInterpretation": "전체 종합 해석 (200-300자) - RAG 컨텍스트를 반영",
+  "questionAnswer": "질문에 대한 핵심 답변 — 카드들이 집합적으로 전하는 메시지, 구체적이고 명확하게. RAG 컨텍스트의 해당 영역 의미를 근거로 제시 (200-280자)",
+  "overallInterpretation": "스프레드 전체의 에너지 흐름과 카드들의 상호작용 — 그래프 관계(원소/수비학/원형 쌍)를 녹여 스토리텔링 방식으로 서술. 각 카드가 다음 카드와 어떻게 연결되는지 흐름 묘사 (300-450자)",
   "cardInterpretations": [
-    { "position": "위치명", "interpretation": "해당 위치 카드 해석 (100-150자)" }
+    { "position": "위치명", "interpretation": "① 카드 이미지와 상징 생생히 묘사 ② 이 위치(해당 포지션의 의미)에서 이 카드가 전하는 메시지 ③ 질문과의 직접적 연결 — 구체적으로 질문에 어떻게 답하는지 ④ 이 카드가 주는 실질적 통찰이나 경고 (250-350자)" }
   ],
-  "conclusion": "🔮 최종 결론 및 조언: 핵심 메시지와 실질적인 행동 조언 (150-200자)"
+  "conclusion": "🔮 최종 메시지: 모든 카드의 에너지를 종합한 핵심 통찰 + 지금 당장 취할 수 있는 구체적 행동 조언 2-3가지 (200-280자)"
 }`;
+  }
+
+  private detectQuestionDomain(question?: string): string {
+    if (!question) return '';
+    const q = question;
+    if (/연애|사랑|남자친구|여자친구|남편|아내|결혼|이별|짝사랑|관계|썸|연인/.test(q)) return '연애/사랑';
+    if (/직장|취업|이직|사업|커리어|일|승진|면접|회사|창업|돈벌|프리랜서/.test(q)) return '직업/커리어';
+    if (/돈|재정|투자|부채|빚|재산|수입|지출|경제|재물|복권|주식/.test(q)) return '재정/돈';
+    if (/건강|아픔|병|수술|몸|체력|다이어트|치료|회복/.test(q)) return '건강';
+    if (/가족|부모|형제|자녀|친구|인간관계|갈등|화해/.test(q)) return '인간관계';
+    return '전반적 인생';
   }
 
   private buildRAGUserPrompt(
@@ -264,35 +277,44 @@ export class AIService {
     graphContext: string | null = null
   ): string {
     const sections: string[] = [];
+    const domain = this.detectQuestionDomain(request.question);
 
     sections.push(`스프레드: ${request.spreadType}`);
-    sections.push(request.question ? `질문: ${request.question}` : '질문: 일반적인 조언을 구합니다.');
+    const questionLine = request.question
+      ? `질문: "${request.question}"`
+      : '질문: 일반적인 삶의 조언을 구합니다.';
+    sections.push(questionLine);
+    if (domain) sections.push(`질문 영역: ${domain} (RAG 컨텍스트에서 이 영역 정보 우선 활용)`);
+    sections.push('');
+    sections.push('⚠️ 중요: 각 카드 해석마다 반드시 위 질문과 직접 연결하여 해석하세요. 일반적 카드 의미만 나열하지 말 것.');
     sections.push('');
 
-    sections.push('=== 뽑힌 카드 및 상세 컨텍스트 ===');
+    sections.push('=== 뽑힌 카드 및 RAG 상세 컨텍스트 ===');
     ragContexts.forEach(({ card, ragDoc }, i) => {
-      sections.push(`\n[${i + 1}번 카드] ${card.position} (${card.positionDescription})`);
-      sections.push(`카드명: ${card.nameKo} (${card.nameEn}) - ${card.isReversed ? '역방향 ↓' : '정방향 ↑'}`);
-      sections.push(`기본 키워드: ${card.keywords.join(', ')}`);
+      sections.push(`\n[${i + 1}번 카드] 포지션: "${card.position}" — ${card.positionDescription}`);
+      sections.push(`카드: ${card.nameKo} (${card.nameEn}) ${card.isReversed ? '【역방향 ↓】' : '【정방향 ↑】'}`);
+      sections.push(`키워드: ${card.keywords.join(', ')}`);
       if (ragDoc) {
         sections.push(`[RAG 상세 정보]\n${ragDoc}`);
       }
+      sections.push(`→ 이 카드가 질문 "${request.question ?? '현재 상황'}"에 대해 전하는 메시지를 위치(${card.positionDescription})의 관점에서 상세히 해석하세요.`);
     });
 
     if (graphContext) {
       sections.push('');
-      sections.push('=== 카드 간 그래프 관계 컨텍스트 ===');
+      sections.push('=== 카드 간 그래프 관계 (해석에 녹여낼 것) ===');
       sections.push(graphContext);
     }
 
     if (questionCards) {
       sections.push('');
-      sections.push('=== 질문과 의미적으로 관련된 카드 참조 ===');
+      sections.push('=== 질문과 의미적으로 공명하는 참조 카드 ===');
       sections.push(questionCards);
     }
 
     sections.push('');
-    sections.push('위 카드들의 RAG 상세 정보와 그래프 관계를 적극 반영하여 종합적으로 해석해 주세요.');
+    sections.push(`위 모든 컨텍스트를 활용하여, 각 카드 해석을 250자 이상으로 풍부하고 생동감 있게 작성하세요.`);
+    sections.push(`특히 질문 "${request.question ?? '현재 상황'}"에 각 카드가 어떻게 답하는지 명확히 연결하세요.`);
 
     return sections.join('\n');
   }
@@ -387,19 +409,26 @@ ${contextLines.join('\n')}
   private buildUserPrompt(request: InterpretRequest): string {
     const cardsDescription = request.cards
       .map((card, i) =>
-        `${i + 1}. ${card.position} (${card.positionDescription})
-   카드: ${card.nameKo} (${card.nameEn}) - ${card.isReversed ? '역방향' : '정방향'}
-   키워드: ${card.keywords.join(', ')}`
+        `[${i + 1}번 카드] 포지션: "${card.position}" — ${card.positionDescription}
+  카드: ${card.nameKo} (${card.nameEn}) ${card.isReversed ? '【역방향 ↓】' : '【정방향 ↑】'}
+  키워드: ${card.keywords.join(', ')}
+  → 이 카드가 질문과 이 위치의 관점에서 무엇을 말하는지 상세히 해석하세요.`
       )
       .join('\n\n');
 
+    const questionLine = request.question
+      ? `질문: "${request.question}"`
+      : '질문: 일반적인 삶의 조언을 구합니다.';
+
     return `스프레드: ${request.spreadType}
-${request.question ? `질문: ${request.question}` : '질문: 일반적인 조언을 구합니다.'}
+${questionLine}
+
+⚠️ 각 카드 해석마다 반드시 위 질문과 직접 연결하여 해석하세요.
 
 선택된 카드:
 ${cardsDescription}
 
-위 카드들을 종합적으로 해석해 주세요.`;
+각 카드를 250자 이상으로 풍부하고 생동감 있게 해석하되, 카드 이미지의 상징을 언급하고 질문과 명확히 연결해 주세요.`;
   }
 }
 
