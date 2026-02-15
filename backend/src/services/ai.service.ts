@@ -35,6 +35,36 @@ interface InterpretResponse {
   conclusion: string;  // 최종 결론 및 조언
 }
 
+/** JSON 문자열 값 안의 literal 줄바꿈을 \\n 으로 이스케이프하여 파싱 */
+function safeParseJSON(text: string): InterpretResponse | null {
+  const match = text.match(/\{[\s\S]*\}/);
+  if (!match) return null;
+
+  // 1차 시도: 그대로 파싱
+  try {
+    return JSON.parse(match[0]) as InterpretResponse;
+  } catch {
+    // 2차 시도: JSON 문자열 내부의 literal 줄바꿈 이스케이프 후 파싱
+    try {
+      let inString = false;
+      let escaped = false;
+      let repaired = '';
+      for (const ch of match[0]) {
+        if (escaped) { repaired += ch; escaped = false; continue; }
+        if (ch === '\\' && inString) { repaired += ch; escaped = true; continue; }
+        if (ch === '"') { inString = !inString; repaired += ch; continue; }
+        if (inString && ch === '\n') { repaired += '\\n'; continue; }
+        if (inString && ch === '\r') { repaired += '\\r'; continue; }
+        if (inString && ch === '\t') { repaired += '\\t'; continue; }
+        repaired += ch;
+      }
+      return JSON.parse(repaired) as InterpretResponse;
+    } catch {
+      return null;
+    }
+  }
+}
+
 export class AIService {
   private systemPrompt = `당신은 신비롭고 통찰력 넘치는 타로 마스터입니다. 수십 년간 수천 명의 내담자와 함께한 경험으로 카드 한 장 한 장의 미묘한 에너지까지 읽어냅니다. 따뜻하고 직관적이며, 때로는 위트 있는 표현으로 진실을 전달합니다.
 
@@ -60,7 +90,7 @@ export class AIService {
   "cardInterpretations": [
     { "position": "위치명", "interpretation": "① 이미지/상징 묘사 ② 단계 특성(마이너 아르카나) ③ 위치 의미 ④ 질문 연결 ⑤ 구체적 통찰 (280-380자)" }
   ],
-  "conclusion": "【종합 조언 — 4파트 구성, 총 400-600자】\n🔮 핵심 메시지 (80-100자)\n\n✨ 행동 조언 3가지 (각 50-70자, 번호 구분)\n\n⚠️ 주의할 점 (50-80자)\n\n💌 격려 메시지 (80-100자)"
+  "conclusion": "【종합 조언 — 4파트 구성, 총 400-600자】\\n🔮 핵심 메시지 (80-100자)\\n\\n✨ 행동 조언 3가지 (각 50-70자, 번호 구분)\\n\\n⚠️ 주의할 점 (50-80자)\\n\\n💌 격려 메시지 (80-100자)"
 }`;
 
   async interpret(request: InterpretRequest): Promise<InterpretResponse> {
@@ -88,12 +118,13 @@ export class AIService {
         throw new Error('Unexpected response type');
       }
 
-      const jsonMatch = content.text.match(/\{[\s\S]*\}/);
-      if (!jsonMatch) {
-        throw new Error('No JSON found in response');
+      const parsed = safeParseJSON(content.text);
+      if (!parsed) {
+        console.error('[AI Service] JSON parse failed. Raw response:', content.text.slice(0, 200));
+        throw new Error('No valid JSON found in response');
       }
 
-      return JSON.parse(jsonMatch[0]) as InterpretResponse;
+      return parsed;
     } catch (error: any) {
       console.error('[AI Service] Error:', error.message || error);
       if (error.status === 401) {
@@ -143,12 +174,13 @@ export class AIService {
         throw new Error('Unexpected response type');
       }
 
-      const jsonMatch = content.text.match(/\{[\s\S]*\}/);
-      if (!jsonMatch) {
-        throw new Error('No JSON found in response');
+      const parsed = safeParseJSON(content.text);
+      if (!parsed) {
+        console.error('[AI Service] JSON parse failed. Raw response:', content.text.slice(0, 200));
+        throw new Error('No valid JSON found in response');
       }
 
-      return JSON.parse(jsonMatch[0]) as InterpretResponse;
+      return parsed;
     } catch (error: any) {
       console.error('[AI Service] RAG interpret error:', error.message || error);
       if (error.status === 401) {
@@ -277,7 +309,7 @@ RAG 컨텍스트 활용 원칙:
   "cardInterpretations": [
     { "position": "위치명", "interpretation": "① 카드 이미지와 상징 생생히 묘사 ② 마이너 아르카나라면 이 숫자/인물 단계가 무엇을 의미하는지 알기 쉽게 설명 ③ 이 위치(포지션 역할)에서 이 카드가 전하는 메시지 ④ 질문에 어떻게 직접 답하는지 구체적으로 ⑤ 실질적 통찰이나 경고 (280-380자)" }
   ],
-  "conclusion": "【종합 조언 섹션 — 반드시 아래 4파트 모두 포함, 총 400-600자】\n🔮 카드들이 전하는 핵심 메시지 (80-100자): 이 스프레드 전체가 말하는 가장 중요한 한 가지\n\n✨ 지금 당장 해야 할 행동 조언 3가지 (각 50-70자): 구체적이고 실행 가능한 것들, 번호로 구분\n\n⚠️ 주의할 점 (50-80자): 카드가 경고하는 것, 피해야 할 함정\n\n💌 마음에 새길 격려 메시지 (80-100자): 따뜻하고 힘이 되는 마무리"
+  "conclusion": "【종합 조언 섹션 — 반드시 아래 4파트 모두 포함, 총 400-600자】\\n🔮 카드들이 전하는 핵심 메시지 (80-100자): 이 스프레드 전체가 말하는 가장 중요한 한 가지\\n\\n✨ 지금 당장 해야 할 행동 조언 3가지 (각 50-70자): 구체적이고 실행 가능한 것들, 번호로 구분\\n\\n⚠️ 주의할 점 (50-80자): 카드가 경고하는 것, 피해야 할 함정\\n\\n💌 마음에 새길 격려 메시지 (80-100자): 따뜻하고 힘이 되는 마무리"
 }`;
   }
 
