@@ -94,13 +94,33 @@ class Neo4jGraphService {
       this.driver = neo4j.driver(
         config.NEO4J_URI,
         neo4j.auth.basic(config.NEO4J_USER, config.NEO4J_PASSWORD),
-        { connectionTimeout: 5000 }
+        {
+          connectionTimeout: 30000,  // 30초로 증가 (Aura 클라우드용)
+          maxConnectionLifetime: 3600000,
+          maxConnectionPoolSize: 50,
+          connectionAcquisitionTimeout: 60000
+        }
       );
       await this.driver.verifyConnectivity();
-      console.log('[Neo4j] 연결 성공:', config.NEO4J_URI);
+      console.log('[Neo4j] ✓ 연결 성공:', config.NEO4J_URI);
       return true;
     } catch (e: any) {
-      console.log('[Neo4j] 연결 실패 (무시):', e.message);
+      console.error('[Neo4j] ❌ 연결 실패:', e.message);
+
+      // 상세 에러 안내
+      if (e.message?.includes('Could not perform discovery')) {
+        console.error('[Neo4j] 💡 Neo4j Aura 인스턴스를 찾을 수 없습니다.');
+        console.error('[Neo4j]    1. https://console.neo4j.io/ 접속');
+        console.error('[Neo4j]    2. Taro_master 인스턴스 상태 확인 (Running/Paused/Stopped)');
+        console.error('[Neo4j]    3. 인스턴스가 중지되었다면 "Resume" 클릭');
+        console.error('[Neo4j]    4. 테스트: npx ts-node scripts/test-neo4j.ts');
+      } else if (e.code === 'ServiceUnavailable') {
+        console.error('[Neo4j] 💡 서비스에 연결할 수 없습니다. 인스턴스가 실행 중인지 확인하세요.');
+      } else if (e.code === 'Neo.ClientError.Security.Unauthorized') {
+        console.error('[Neo4j] 💡 인증 실패. .env 파일의 NEO4J_PASSWORD를 확인하세요.');
+      }
+
+      console.log('[Neo4j] ⚠️  그래프 기능 비활성화 (서버는 정상 작동)');
       this.driver = null;
       return false;
     }

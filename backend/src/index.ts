@@ -27,7 +27,7 @@ async function initializeNeo4j() {
   try {
     const ok = await neo4jGraphService.connect();
     if (!ok) {
-      console.log('[Neo4j] 비활성화 (NEO4J_PASSWORD 미설정 또는 연결 실패)');
+      // 상세 에러는 neo4j.service.ts에서 출력됨
       return;
     }
     await neo4jGraphService.initializeSchema();
@@ -35,9 +35,9 @@ async function initializeNeo4j() {
       orderBy: [{ type: 'asc' }, { number: 'asc' }]
     });
     await neo4jGraphService.seedTarotGraph(cards);
-    console.log('[Neo4j] 78개 타로 카드 그래프 초기화 완료');
+    console.log('[Neo4j] ✓ 78개 타로 카드 그래프 초기화 완료');
   } catch (e: any) {
-    console.log('[Neo4j] 초기화 건너뜀:', e.message);
+    console.error('[Neo4j] ❌ 초기화 실패:', e.message);
   }
 }
 
