@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { motion } from 'framer-motion';
 import { Card } from '../../types';
 
@@ -97,6 +98,8 @@ const TarotCard = ({
   disabled = false,
   showName = true
 }: TarotCardProps) => {
+  const [imageLoaded, setImageLoaded] = useState(false);
+  const [imageFailed, setImageFailed] = useState(false);
   const textSize = textSizeClasses[size];
   const imagePath = getCardImagePath(card);
 
@@ -130,12 +133,35 @@ const TarotCard = ({
         <div className="absolute w-full h-full rounded-2xl overflow-hidden backface-hidden rotate-y-180 shadow-2xl">
           {/* 카드 이미지 */}
           <div className={`relative w-full h-full ${isReversed ? 'rotate-180' : ''}`}>
+            {/* 스켈레톤 UI - 이미지 로딩 중 표시 */}
+            {!imageLoaded && !imageFailed && (
+              <div className="absolute inset-0 bg-gradient-to-br from-purple-900/40 via-pink-900/30 to-cyan-900/40 animate-pulse">
+                <div className="flex flex-col items-center justify-center h-full">
+                  <div className="w-16 h-16 border-4 border-accent/30 border-t-accent rounded-full animate-spin mb-3" />
+                  <p className="text-white/60 text-xs">Loading...</p>
+                </div>
+              </div>
+            )}
+
+            {/* 이미지 로드 실패 시 폴백 UI */}
+            {imageFailed && (
+              <div className="absolute inset-0 bg-gradient-to-br from-gray-800 to-gray-900 flex flex-col items-center justify-center">
+                <span className="text-4xl mb-2">🃏</span>
+                <p className="text-white/80 text-sm font-semibold">{card.nameKo}</p>
+                <p className="text-white/40 text-xs mt-1">{card.nameEn}</p>
+              </div>
+            )}
+
             <img
               src={imagePath}
               alt={card.nameKo}
-              className="w-full h-full object-cover"
+              className={`w-full h-full object-cover transition-opacity duration-300 ${
+                imageLoaded ? 'opacity-100' : 'opacity-0'
+              }`}
+              onLoad={() => setImageLoaded(true)}
               onError={(e) => {
                 // 이미지 로드 실패 시 폴백
+                setImageFailed(true);
                 const target = e.target as HTMLImageElement;
                 target.style.display = 'none';
               }}
