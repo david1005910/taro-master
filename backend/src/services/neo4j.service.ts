@@ -1,5 +1,14 @@
-import neo4j, { Driver, Session } from 'neo4j-driver';
+import neo4j, { Driver, Session, Integer } from 'neo4j-driver';
 import { config } from '../config/env';
+
+// ─── Neo4j Integer 안전 변환 헬퍼 ─────────────────────────────────────────────
+function safeToNumber(value: any): number {
+  if (value === null || value === undefined) return 0;
+  if (typeof value === 'number') return value;
+  if (neo4j.isInt(value)) return value.toInt();
+  if (typeof value === 'object' && 'low' in value) return value.low;
+  return Number(value) || 0;
+}
 
 // ─── 원소 매핑 ────────────────────────────────────────────────────────────────
 const SUIT_TO_ELEMENT: Record<string, string> = {
@@ -241,7 +250,7 @@ class Neo4jGraphService {
       );
       const elemCount: Record<string, number> = {};
       for (const rec of elemRes.records) {
-        elemCount[rec.get('element')] = rec.get('cnt').toNumber();
+        elemCount[rec.get('element')] = safeToNumber(rec.get('cnt'));
       }
       const dominantElement = Object.entries(elemCount).sort((a, b) => b[1] - a[1])[0]?.[0] ?? null;
 
@@ -326,18 +335,18 @@ class Neo4jGraphService {
         nameEn: c.nameEn,
         element: c.element,
         sharedElement: sharedRes.records.map(r => ({
-          cardId: r.get('cardId').toNumber(),
+          cardId: safeToNumber(r.get('cardId')),
           nameKo: r.get('nameKo'),
           nameEn: r.get('nameEn')
         })),
         numerological: numRes.records.map(r => ({
-          cardId: r.get('cardId').toNumber(),
+          cardId: safeToNumber(r.get('cardId')),
           nameKo: r.get('nameKo'),
           nameEn: r.get('nameEn'),
-          number: r.get('number').toNumber()
+          number: safeToNumber(r.get('number'))
         })),
         archetypal: archRes.records.map(r => ({
-          cardId: r.get('cardId').toNumber(),
+          cardId: safeToNumber(r.get('cardId')),
           nameKo: r.get('nameKo'),
           nameEn: r.get('nameEn'),
           theme: r.get('theme')
@@ -413,18 +422,18 @@ class Neo4jGraphService {
 
       const elementDistribution: Record<string, number> = {};
       for (const rec of elemRes.records) {
-        elementDistribution[rec.get('element')] = rec.get('cnt').toNumber();
+        elementDistribution[rec.get('element')] = safeToNumber(rec.get('cnt'));
       }
 
       return {
         topCards: cardRes.records.map(r => ({
-          cardId: r.get('cardId').toNumber(),
+          cardId: safeToNumber(r.get('cardId')),
           nameKo: r.get('nameKo'),
           nameEn: r.get('nameEn'),
-          count: r.get('cnt').toNumber()
+          count: safeToNumber(r.get('cnt'))
         })),
         elementDistribution,
-        totalReadings: readingRes.records[0]?.get('total').toNumber() ?? 0
+        totalReadings: safeToNumber(readingRes.records[0]?.get('total')) || 0
       };
     } catch (e: any) {
       console.error('[Neo4j] getUserPatterns 오류:', e.message);
@@ -444,8 +453,8 @@ class Neo4jGraphService {
       const relRes = await session.run('MATCH ()-[r]->() RETURN count(r) AS cnt');
       return {
         connected: true,
-        nodeCount: nodeRes.records[0]?.get('cnt').toNumber() ?? 0,
-        relationshipCount: relRes.records[0]?.get('cnt').toNumber() ?? 0
+        nodeCount: safeToNumber(nodeRes.records[0]?.get('cnt')) || 0,
+        relationshipCount: safeToNumber(relRes.records[0]?.get('cnt')) || 0
       };
     } catch {
       return { connected: false, nodeCount: 0, relationshipCount: 0 };
