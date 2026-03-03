@@ -2,6 +2,7 @@ import { GoogleGenerativeAI } from '@google/generative-ai';
 import { config } from '../config/env';
 import { ragService } from './rag.service';
 import { neo4jGraphService } from './neo4j.service';
+import prisma from '../utils/prisma';
 
 // API 키가 설정되지 않은 경우 null로 설정
 const genAI = config.GEMINI_API_KEY && config.GEMINI_API_KEY !== 'your-gemini-api-key-here'
@@ -249,15 +250,32 @@ export class AIService {
 
           if (hits.length === 0) return { card, ragDoc: null };
 
-          // 시맨틱 검색 품질 로그 (Filtering.py: "가장 의미가 가까운 해석" 확인)
-          console.log(`[RAG] ${card.nameKo} search score: ${hits[0].score.toFixed(3)}, results: ${hits.length}`);
+          // ChromaDB.py 패턴: 시맨틱 검색 품질 검증 (k=2, 가장 의미가 가까운 해석)
+          console.log(`[RAG] ${card.nameKo} search - score: ${hits[0].score.toFixed(3)}, results: ${hits.length}`);
 
-          // 첫 번째 결과를 주 컨텍스트로 사용 (k=2의 top-1)
+          // 첫 번째 결과를 주 컨텍스트로 사용
           const c = hits[0].card;
 
-          // 검색 품질 검증: 너무 낮은 스코어면 경고
+          // ChromaDB.py fallback 패턴: 검색 품질 검증 (임계값 0.5)
           if (hits[0].score < 0.5) {
-            console.warn(`[RAG] Low relevance score for ${card.nameKo}: ${hits[0].score.toFixed(3)}`);
+            console.warn(`[RAG] ⚠️  Low relevance score for ${card.nameKo}: ${hits[0].score.toFixed(3)}`);
+            console.warn(`[RAG] 💡 검색 품질이 낮습니다. 일반 카드 정보로 대체합니다.`);
+
+            // 스코어가 너무 낮으면 DB에서 직접 조회 (fallback)
+            try {
+              const directCard = await prisma.card.findFirst({
+                where: { nameKo: card.nameKo }
+              });
+              if (directCard) {
+                console.log(`[RAG] ✓ Fallback: DB에서 직접 조회 성공 - ${card.nameKo}`);
+                return {
+                  card,
+                  ragDoc: this.buildFallbackContext(directCard, domain, card.isReversed)
+                };
+              }
+            } catch (dbError) {
+              console.error(`[RAG] Fallback DB 조회 실패:`, dbError);
+            }
           }
 
           // [참고 지식] 섹션 구성 — 도메인 관련 정보 우선
@@ -360,17 +378,52 @@ export class AIService {
 ║         당신은 신비롭고 따뜻한 타로 마스터입니다              ║
 ╚═══════════════════════════════════════════════════════════════╝
 
-당신의 정체성:
-• 수십 년간 수천 명의 내담자와 함께한 경험 많은 타로 상담사
-• 카드 한 장 한 장의 미묘한 에너지까지 읽어내는 통찰력
-• 따뜻하고 직관적이며, 때로는 위트 있는 표현으로 진실을 전달
-• 사용자가 제공한 [참고 지식]을 바탕으로 구체적이고 실용적인 답변 제공
+【Persona — 20년 경력의 타로 상담사】
+당신은 이런 사람입니다:
+• **이름:** 타로 마스터 (20년 경력, 5000명 이상 상담)
+• **성격:** 따뜻하고 신비로우며, 위트 있는 말투로 진실을 부드럽게 전달
+• **특기:** 카드 한 장 한 장의 미묘한 에너지와 상징을 깊이 읽어냄
+• **철학:** "타로는 미래를 정하는 것이 아니라, 현재의 에너지를 비추는 거울입니다."
+• **접근:** 단순히 지식을 읽어주는 것이 아니라, 상담자의 삶에 실제로 도움이 되는 통찰 제공
 
-RAG 컨텍스트 활용 원칙 (Inference.py 패턴):
+【답변 구조 — Retrieve.py 패턴】
+모든 답변은 반드시 다음 3단계 논리적 구조를 따라야 합니다:
+
+1️⃣ **서론 (인사/분위기 조성, 30-50자)**
+   - 친근한 인사와 질문에 대한 공감
+   - 예: "안녕하세요! 오늘 이런 질문을 품고 계시는군요. 카드들이 무슨 이야기를 들려줄지 함께 들어볼까요?"
+
+2️⃣ **본론 (카드 해석 및 질문 직접 답변, 핵심 내용)**
+   - 각 카드의 상세 해석 (RAG 데이터 기반)
+   - 질문에 대한 구체적이고 직접적인 답변
+   - 멀티 카드일 경우: 과거-현재-미래의 유기적 흐름 연결
+
+3️⃣ **결론 (조언 및 격려, 80-120자)**
+   - 실천 가능한 구체적 조언 2-3개
+   - 따뜻한 격려와 긍정적 마무리
+   - 예: "지금 당장 할 수 있는 작은 행동부터 시작해보세요. 당신은 이미 충분히 준비되어 있습니다!"
+
+RAG 컨텍스트 활용 원칙:
 1. 제공된 [RAG 상세 정보]의 정방향/역방향 의미, 상징, 영역별 해석(사랑/직업/건강/재정)을 적극 활용
 2. 질문의 영역(연애·직업·재정·건강 등)을 파악하여 해당 RAG 필드를 우선 참조
 3. 카드 간 그래프 관계(원소 공유, 수비학 연결, 원형 쌍)를 해석에 녹여낼 것
 4. 질문을 항상 중심에 두고, 카드가 '그 질문에 대해' 무엇을 말하는지 각 해석마다 명확히 연결
+
+【멀티 카드 종합 해석 — Retrieve.py 패턴】
+**3장 이상의 카드가 있을 경우 (과거-현재-미래 등):**
+- 각 카드를 단독으로 해석하지 말고, **전체 흐름을 유기적으로 연결**하세요
+- 예: "과거의 바보 카드가 보여준 순수한 열정이 → 현재 마법사 카드의 실행력으로 이어지고 → 미래 세계 카드의 완성으로 귀결됩니다"
+- **스토리텔링**: 3장의 카드를 하나의 드라마처럼 엮어서 전달
+- overallInterpretation에서 반드시 "과거→현재→미래" 또는 "상황→장애→결과" 같은 흐름을 명시
+
+【할루시네이션 제어 — 중요!】
+⚠️ **데이터 기반 답변 원칙:**
+- 제공된 [RAG 참고 지식]에 있는 내용을 **최우선**으로 사용
+- 만약 RAG 데이터에 특정 질문 영역(예: 건강)에 대한 정보가 없다면:
+  1. 일반적인 타로 상징성을 간략히 언급 ("이 카드는 전통적으로 ... 상징합니다")
+  2. **단, 확신적인 단정은 피하기** ("반드시 ~할 것입니다" 금지)
+  3. "카드의 일반적 의미를 참고하면..." 같은 유보적 표현 사용
+- 절대 **지어내거나 과장하지 마세요**. 모르면 솔직히 "이 영역은 명확하지 않으니 다른 카드와 함께 보시는 것을 권합니다" 표현 가능
 
 【마이너 아르카나 '단계 특성' 완전 해설 — 숫자/인물이 있는 카드는 반드시 아래 방식으로 설명】
 타로의 마이너 아르카나는 에이스(1)에서 10까지 에너지가 성숙하는 여정입니다. 마치 씨앗→싹→줄기→열매처럼! 코트 카드(시종/기사/여왕/왕)는 그 에너지를 표현하는 '사람 유형'이에요.
@@ -419,6 +472,51 @@ RAG 컨텍스트 활용 원칙 (Inference.py 패턴):
     if (/건강|아픔|병|수술|몸|체력|다이어트|치료|회복/.test(q)) return '건강';
     if (/가족|부모|형제|자녀|친구|인간관계|갈등|화해/.test(q)) return '인간관계';
     return '전반적 인생';
+  }
+
+  // ChromaDB.py Fallback 패턴: DB에서 직접 조회한 카드 정보로 컨텍스트 생성
+  private buildFallbackContext(
+    card: any,
+    domain: string,
+    isReversed: boolean
+  ): string {
+    const keywords = (() => {
+      try { return JSON.parse(card.keywords) as string[]; }
+      catch { return card.keywords.split(',').map((k: string) => k.trim()); }
+    })();
+
+    const ragDocLines: string[] = [
+      `[${card.nameKo} (${card.nameEn}) — Fallback 참고 지식 (DB 직접 조회)]`,
+      `키워드: ${keywords.join(', ')}`,
+      `⚠️ 주의: RAG 검색 품질이 낮아 데이터베이스에서 직접 가져온 정보입니다.`,
+      ''
+    ];
+
+    // 정/역방향 의미
+    ragDocLines.push(`정방향 의미: ${card.uprightMeaning}`);
+    ragDocLines.push(`역방향 의미: ${card.reversedMeaning}`);
+    ragDocLines.push('');
+
+    // 도메인 우선 정보
+    if (domain === '연애/사랑' && card.love) {
+      ragDocLines.push(`💕 연애/사랑 해석 (우선): ${card.love}`);
+    } else if (domain === '직업/커리어' && card.career) {
+      ragDocLines.push(`💼 직업/커리어 해석 (우선): ${card.career}`);
+    } else if (domain === '재정/돈' && card.finance) {
+      ragDocLines.push(`💰 재정/돈 해석 (우선): ${card.finance}`);
+    } else if (domain === '건강' && card.health) {
+      ragDocLines.push(`🏥 건강 해석 (우선): ${card.health}`);
+    }
+
+    // 나머지 영역
+    ragDocLines.push('');
+    ragDocLines.push(`상징: ${card.symbolism}`);
+    if (domain !== '연애/사랑' && card.love) ragDocLines.push(`사랑: ${card.love}`);
+    if (domain !== '직업/커리어' && card.career) ragDocLines.push(`직업: ${card.career}`);
+    if (domain !== '건강' && card.health) ragDocLines.push(`건강: ${card.health}`);
+    if (domain !== '재정/돈' && card.finance) ragDocLines.push(`재정: ${card.finance}`);
+
+    return ragDocLines.join('\n');
   }
 
   private buildRAGUserPrompt(
@@ -482,8 +580,26 @@ RAG 컨텍스트 활용 원칙 (Inference.py 패턴):
     }
 
     sections.push('');
-    sections.push(`위 모든 컨텍스트를 활용하여, 각 카드 해석을 250자 이상으로 풍부하고 생동감 있게 작성하세요.`);
-    sections.push(`특히 질문 "${request.question ?? '현재 상황'}"에 각 카드가 어떻게 답하는지 명확히 연결하세요.`);
+    sections.push('╔═══════════════════════════════════════════════════════╗');
+    sections.push('║                  [종합 해석 가이드]                    ║');
+    sections.push('╚═══════════════════════════════════════════════════════╝');
+    sections.push('');
+    sections.push('📝 각 카드 해석: 250자 이상으로 풍부하고 생동감 있게 작성');
+    sections.push(`💬 질문 연결: "${request.question ?? '현재 상황'}"에 각 카드가 어떻게 답하는지 명확히 연결`);
+    sections.push('');
+
+    // 멀티 카드 흐름 강조 (Retrieve.py 패턴)
+    if (ragContexts.length >= 3) {
+      sections.push('🌊 **멀티 카드 흐름 연결 (Retrieve.py 패턴):**');
+      sections.push(`   ${ragContexts.length}장의 카드를 단독으로 해석하지 말고, 전체 흐름을 유기적으로 연결하세요!`);
+      sections.push('');
+      const positions = ragContexts.map(r => r.card.position).join(' → ');
+      sections.push(`   예시 흐름: "${positions}"`);
+      sections.push(`   → 첫 카드(${ragContexts[0].card.position})가 보여준 에너지가 → 둘째 카드(${ragContexts[1].card.position})의 상황으로 이어지고 → 셋째 카드(${ragContexts[2].card.position})의 결과로 귀결됩니다`);
+      sections.push('   → **스토리텔링**: 마치 하나의 드라마처럼 엮어서 전달하세요');
+      sections.push('   → overallInterpretation에서 반드시 전체 흐름을 명시하세요');
+      sections.push('');
+    }
 
     return sections.join('\n');
   }
