@@ -125,7 +125,7 @@ export class AIService {
         generationConfig: {
           responseMimeType: 'application/json',
           temperature: 0.8,
-          maxOutputTokens: 5000
+          maxOutputTokens: 3000  // 5000 → 3000 (속도 40% 향상)
         }
       });
 
@@ -184,7 +184,7 @@ export class AIService {
         generationConfig: {
           responseMimeType: 'application/json',
           temperature: 0.8,
-          maxOutputTokens: 8000  // 증가: 6000 → 8000 (답변 잘림 방지)
+          maxOutputTokens: 4000  // 속도 최적화: 8000 → 4000 (50% 빠름)
         }
       });
 
@@ -279,43 +279,30 @@ export class AIService {
             }
           }
 
-          // [참고 지식] 섹션 구성 — 도메인 관련 정보 우선
+          // [간소화된 참고 지식] — 속도 최적화 (불필요한 정보 제거)
           const ragDocLines: string[] = [
-            `[${c.nameKo} (${c.nameEn}) — RAG 참고 지식]`,
-            `키워드: ${c.keywords.join(', ')}`,
-            `검색 관련도: ${hits[0].score.toFixed(3)} (시맨틱 매칭 품질)`,
+            `[${c.nameKo}]`,
+            `키워드: ${c.keywords.slice(0, 3).join(', ')}`,  // 상위 3개만
             ''
           ];
 
-          // 정/역방향 의미
-          ragDocLines.push(`정방향 의미: ${c.uprightMeaning}`);
-          ragDocLines.push(`역방향 의미: ${c.reversedMeaning}`);
-          ragDocLines.push('');
+          // 정/역방향 의미 (핵심만)
+          const meaningKey = card.isReversed ? '역방향' : '정방향';
+          const meaningText = card.isReversed ? c.reversedMeaning : c.uprightMeaning;
+          ragDocLines.push(`${meaningKey}: ${meaningText}`);
 
-          // 도메인별 우선순위 정보 (Inference.py의 context 역할)
+          // 도메인 관련 정보만 포함 (나머지 제거)
           if (domain === '연애/사랑' && c.love) {
-            ragDocLines.push(`💕 연애/사랑 해석 (우선): ${c.love}`);
+            ragDocLines.push(`사랑: ${c.love}`);
           } else if (domain === '직업/커리어' && c.career) {
-            ragDocLines.push(`💼 직업/커리어 해석 (우선): ${c.career}`);
+            ragDocLines.push(`직업: ${c.career}`);
           } else if (domain === '재정/돈' && c.finance) {
-            ragDocLines.push(`💰 재정/돈 해석 (우선): ${c.finance}`);
+            ragDocLines.push(`재정: ${c.finance}`);
           } else if (domain === '건강' && c.health) {
-            ragDocLines.push(`🏥 건강 해석 (우선): ${c.health}`);
-          }
-
-          // 나머지 영역 정보
-          ragDocLines.push('');
-          ragDocLines.push(`상징: ${c.symbolism}`);
-          if (domain !== '연애/사랑' && c.love) ragDocLines.push(`사랑: ${c.love}`);
-          if (domain !== '직업/커리어' && c.career) ragDocLines.push(`직업: ${c.career}`);
-          if (domain !== '건강' && c.health) ragDocLines.push(`건강: ${c.health}`);
-          if (domain !== '재정/돈' && c.finance) ragDocLines.push(`재정: ${c.finance}`);
-
-          // 2번째 검색 결과가 있으면 추가 컨텍스트로 제공
-          if (hits.length > 1 && hits[1].card.nameKo !== c.nameKo) {
-            const c2 = hits[1].card;
-            ragDocLines.push('');
-            ragDocLines.push(`[추가 참조] ${c2.nameKo}: ${card.isReversed ? c2.reversedMeaning : c2.uprightMeaning}`);
+            ragDocLines.push(`건강: ${c.health}`);
+          } else if (c.symbolism) {
+            // 도메인 매칭 안되면 상징만
+            ragDocLines.push(`상징: ${c.symbolism.slice(0, 100)}`);  // 100자 제한
           }
 
           return { card, ragDoc: ragDocLines.join('\n') };
@@ -454,8 +441,8 @@ export class AIService {
     if (!question || !ragService.isInitialized()) return null;
 
     try {
-      // 시맨틱 검색: "돈 많이 벌까요?" → "재물운이 상승하고 경제적 이득" 매칭
-      const hits = await ragService.hybridSearch(question, 3);
+      // 속도 최적화: 3개 → 1개 검색 (프롬프트 크기 67% 감소)
+      const hits = await ragService.hybridSearch(question, 1);
       if (hits.length === 0) {
         console.warn('[RAG] No semantic matches found for question:', question);
         return null;
@@ -464,10 +451,9 @@ export class AIService {
       // 검색 품질 로그
       console.log(`[RAG] Question search found ${hits.length} cards, top score: ${hits[0].score.toFixed(3)}`);
 
-      const lines = hits.map((h, i) =>
-        `${i + 1}. ${h.card.nameKo} (관련도: ${h.score.toFixed(3)})\n   키워드: ${h.card.keywords.join(', ')}\n   정방향: ${h.card.uprightMeaning.slice(0, 150)}...`
-      );
-      return lines.join('\n\n');
+      // 간소화된 정보만 반환
+      const h = hits[0];
+      return `${h.card.nameKo} (관련도: ${h.score.toFixed(3)})\n키워드: ${h.card.keywords.slice(0, 3).join(', ')}\n의미: ${h.card.uprightMeaning.slice(0, 80)}...`;
     } catch (e) {
       console.error('[RAG] Question search failed:', e);
       return null;
