@@ -216,7 +216,7 @@ export class AIService {
     }
   }
 
-  // 각 뽑힌 카드에 대한 Qdrant RAG 컨텍스트 조회 (Inference.py 패턴 적용)
+  // 각 뽑힌 카드에 대한 Qdrant RAG 컨텍스트 조회 (Filtering.py 패턴 적용)
   private async fetchCardRAGContexts(
     cards: CardInput[],
     question?: string
@@ -229,24 +229,42 @@ export class AIService {
     const domain = this.detectQuestionDomain(question);
     const questionDomainHint = question || '현재 상황';
 
+    // 멀티 카드 처리: 각 카드별로 병렬 검색 (Filtering.py 권장)
     const results = await Promise.all(
       cards.map(async (card) => {
         try {
           // Inference.py 패턴: "{카드명} 카드가 나왔을 때, {질문}에 대한 해석은?"
           const query = `${card.nameKo} 카드가 ${card.isReversed ? '역방향으로' : '정방향으로'} 나왔을 때, ${questionDomainHint}에 대한 해석은?`;
 
-          // Hybrid 검색으로 의미적 + 키워드 매칭 결합 (k=2)
-          const hits = await ragService.hybridSearch(query, 2);
+          // Filtering.py 패턴: 메타데이터 필터로 해당 카드만 검색 (다른 카드 섞이지 않도록)
+          let hits = await ragService.hybridSearch(query, 2, {
+            nameKo: card.nameKo
+          });
+
+          // Fallback: 필터링 결과 없으면 일반 검색 (Filtering.py 권장)
+          if (hits.length === 0) {
+            console.warn(`[AI] No filtered results for ${card.nameKo}, trying general search...`);
+            hits = await ragService.hybridSearch(query, 2);
+          }
 
           if (hits.length === 0) return { card, ragDoc: null };
 
-          // 첫 번째 결과를 주 컨텍스트로 사용
+          // 시맨틱 검색 품질 로그 (Filtering.py: "가장 의미가 가까운 해석" 확인)
+          console.log(`[RAG] ${card.nameKo} search score: ${hits[0].score.toFixed(3)}, results: ${hits.length}`);
+
+          // 첫 번째 결과를 주 컨텍스트로 사용 (k=2의 top-1)
           const c = hits[0].card;
+
+          // 검색 품질 검증: 너무 낮은 스코어면 경고
+          if (hits[0].score < 0.5) {
+            console.warn(`[RAG] Low relevance score for ${card.nameKo}: ${hits[0].score.toFixed(3)}`);
+          }
 
           // [참고 지식] 섹션 구성 — 도메인 관련 정보 우선
           const ragDocLines: string[] = [
             `[${c.nameKo} (${c.nameEn}) — RAG 참고 지식]`,
             `키워드: ${c.keywords.join(', ')}`,
+            `검색 관련도: ${hits[0].score.toFixed(3)} (시맨틱 매칭 품질)`,
             ''
           ];
 
@@ -312,19 +330,27 @@ export class AIService {
     }
   }
 
-  // 질문을 벡터 검색하여 관련 카드 컨텍스트 조회
+  // 질문을 벡터 검색하여 관련 카드 컨텍스트 조회 (Filtering.py: 시맨틱 검색)
   private async fetchQuestionRAGCards(question?: string): Promise<string | null> {
     if (!question || !ragService.isInitialized()) return null;
 
     try {
+      // 시맨틱 검색: "돈 많이 벌까요?" → "재물운이 상승하고 경제적 이득" 매칭
       const hits = await ragService.hybridSearch(question, 3);
-      if (hits.length === 0) return null;
+      if (hits.length === 0) {
+        console.warn('[RAG] No semantic matches found for question:', question);
+        return null;
+      }
+
+      // 검색 품질 로그
+      console.log(`[RAG] Question search found ${hits.length} cards, top score: ${hits[0].score.toFixed(3)}`);
 
       const lines = hits.map((h, i) =>
-        `${i + 1}. ${h.card.nameKo} (점수: ${h.score.toFixed(3)})\n   키워드: ${h.card.keywords.join(', ')}\n   정방향: ${h.card.uprightMeaning}`
+        `${i + 1}. ${h.card.nameKo} (관련도: ${h.score.toFixed(3)})\n   키워드: ${h.card.keywords.join(', ')}\n   정방향: ${h.card.uprightMeaning.slice(0, 150)}...`
       );
       return lines.join('\n\n');
-    } catch {
+    } catch (e) {
+      console.error('[RAG] Question search failed:', e);
       return null;
     }
   }

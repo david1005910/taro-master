@@ -284,12 +284,32 @@ class TarotRAGService {
     }
   }
 
-  async semanticSearch(query: string, limit = 5): Promise<SearchResult[]> {
+  async semanticSearch(
+    query: string,
+    limit = 5,
+    cardFilter?: { nameKo?: string; nameEn?: string; cardId?: number }
+  ): Promise<SearchResult[]> {
     const vector = await this.embedQuery(query);
+
+    // Filtering.py 패턴: 메타데이터 필터링으로 특정 카드만 검색
+    const filter: any = cardFilter ? { must: [] } : undefined;
+    if (cardFilter) {
+      if (cardFilter.cardId) {
+        filter.must.push({ key: 'id', match: { value: cardFilter.cardId } });
+      }
+      if (cardFilter.nameKo) {
+        filter.must.push({ key: 'nameKo', match: { value: cardFilter.nameKo } });
+      }
+      if (cardFilter.nameEn) {
+        filter.must.push({ key: 'nameEn', match: { value: cardFilter.nameEn } });
+      }
+    }
+
     const results = await this.qdrant.search(COLLECTION_NAME, {
       vector: { name: 'dense', vector },
       limit,
-      with_payload: true
+      with_payload: true,
+      filter
     });
 
     return results.map((r, i) => ({
@@ -299,14 +319,33 @@ class TarotRAGService {
     }));
   }
 
-  async sparseSearch(query: string, limit = 5): Promise<SearchResult[]> {
+  async sparseSearch(
+    query: string,
+    limit = 5,
+    cardFilter?: { nameKo?: string; nameEn?: string; cardId?: number }
+  ): Promise<SearchResult[]> {
     const { indices, values } = this.bm25.transform(query);
     if (indices.length === 0) return [];
+
+    // Filtering.py 패턴: 메타데이터 필터링
+    const filter: any = cardFilter ? { must: [] } : undefined;
+    if (cardFilter) {
+      if (cardFilter.cardId) {
+        filter.must.push({ key: 'id', match: { value: cardFilter.cardId } });
+      }
+      if (cardFilter.nameKo) {
+        filter.must.push({ key: 'nameKo', match: { value: cardFilter.nameKo } });
+      }
+      if (cardFilter.nameEn) {
+        filter.must.push({ key: 'nameEn', match: { value: cardFilter.nameEn } });
+      }
+    }
 
     const results = await this.qdrant.search(COLLECTION_NAME, {
       vector: { name: 'bm25', vector: { indices, values } },
       limit,
-      with_payload: true
+      with_payload: true,
+      filter
     });
 
     return results.map((r, i) => ({
@@ -316,9 +355,27 @@ class TarotRAGService {
     }));
   }
 
-  async hybridSearch(query: string, limit = 5): Promise<SearchResult[]> {
+  async hybridSearch(
+    query: string,
+    limit = 5,
+    cardFilter?: { nameKo?: string; nameEn?: string; cardId?: number }
+  ): Promise<SearchResult[]> {
     const denseVector = await this.embedQuery(query);
     const { indices, values } = this.bm25.transform(query);
+
+    // Filtering.py 패턴: 메타데이터 필터링
+    const filter: any = cardFilter ? { must: [] } : undefined;
+    if (cardFilter) {
+      if (cardFilter.cardId) {
+        filter.must.push({ key: 'id', match: { value: cardFilter.cardId } });
+      }
+      if (cardFilter.nameKo) {
+        filter.must.push({ key: 'nameKo', match: { value: cardFilter.nameKo } });
+      }
+      if (cardFilter.nameEn) {
+        filter.must.push({ key: 'nameEn', match: { value: cardFilter.nameEn } });
+      }
+    }
 
     const prefetch: any[] = [
       { query: denseVector, using: 'dense', limit: 20 }
@@ -332,7 +389,8 @@ class TarotRAGService {
       prefetch,
       query: { fusion: 'rrf' },
       limit,
-      with_payload: true
+      with_payload: true,
+      filter
     });
 
     return results.points.map((r, i) => ({
