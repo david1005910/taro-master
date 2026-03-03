@@ -168,9 +168,9 @@ export class AIService {
       };
     }
 
-    // 병렬로 RAG + 그래프 컨텍스트 수집
+    // 병렬로 RAG + 그래프 컨텍스트 수집 (Inference.py 패턴: 카드+질문 결합 검색)
     const [ragCardContexts, questionRagCards, graphContext] = await Promise.all([
-      this.fetchCardRAGContexts(request.cards),
+      this.fetchCardRAGContexts(request.cards, request.question),
       this.fetchQuestionRAGCards(request.question),
       this.fetchGraphContext(request.cards)
     ]);
@@ -216,31 +216,74 @@ export class AIService {
     }
   }
 
-  // 각 뽑힌 카드에 대한 Qdrant RAG 컨텍스트 조회
-  private async fetchCardRAGContexts(cards: CardInput[]): Promise<Array<{ card: CardInput; ragDoc: string | null }>> {
+  // 각 뽑힌 카드에 대한 Qdrant RAG 컨텍스트 조회 (Inference.py 패턴 적용)
+  private async fetchCardRAGContexts(
+    cards: CardInput[],
+    question?: string
+  ): Promise<Array<{ card: CardInput; ragDoc: string | null }>> {
     if (!ragService.isInitialized()) {
       return cards.map(card => ({ card, ragDoc: null }));
     }
 
+    // 질문 도메인 감지 (chunks 필터링용)
+    const domain = this.detectQuestionDomain(question);
+    const questionDomainHint = question || '현재 상황';
+
     const results = await Promise.all(
       cards.map(async (card) => {
         try {
-          const hits = await ragService.semanticSearch(card.nameKo, 1);
+          // Inference.py 패턴: "{카드명} 카드가 나왔을 때, {질문}에 대한 해석은?"
+          const query = `${card.nameKo} 카드가 ${card.isReversed ? '역방향으로' : '정방향으로'} 나왔을 때, ${questionDomainHint}에 대한 해석은?`;
+
+          // Hybrid 검색으로 의미적 + 키워드 매칭 결합 (k=2)
+          const hits = await ragService.hybridSearch(query, 2);
+
           if (hits.length === 0) return { card, ragDoc: null };
+
+          // 첫 번째 결과를 주 컨텍스트로 사용
           const c = hits[0].card;
-          const ragDoc = [
-            `[${c.nameKo} (${c.nameEn})]`,
+
+          // [참고 지식] 섹션 구성 — 도메인 관련 정보 우선
+          const ragDocLines: string[] = [
+            `[${c.nameKo} (${c.nameEn}) — RAG 참고 지식]`,
             `키워드: ${c.keywords.join(', ')}`,
-            `정방향 의미: ${c.uprightMeaning}`,
-            `역방향 의미: ${c.reversedMeaning}`,
-            `상징: ${c.symbolism}`,
-            `사랑: ${c.love}`,
-            `직업: ${c.career}`,
-            `건강: ${c.health}`,
-            `재정: ${c.finance}`
-          ].join('\n');
-          return { card, ragDoc };
-        } catch {
+            ''
+          ];
+
+          // 정/역방향 의미
+          ragDocLines.push(`정방향 의미: ${c.uprightMeaning}`);
+          ragDocLines.push(`역방향 의미: ${c.reversedMeaning}`);
+          ragDocLines.push('');
+
+          // 도메인별 우선순위 정보 (Inference.py의 context 역할)
+          if (domain === '연애/사랑' && c.love) {
+            ragDocLines.push(`💕 연애/사랑 해석 (우선): ${c.love}`);
+          } else if (domain === '직업/커리어' && c.career) {
+            ragDocLines.push(`💼 직업/커리어 해석 (우선): ${c.career}`);
+          } else if (domain === '재정/돈' && c.finance) {
+            ragDocLines.push(`💰 재정/돈 해석 (우선): ${c.finance}`);
+          } else if (domain === '건강' && c.health) {
+            ragDocLines.push(`🏥 건강 해석 (우선): ${c.health}`);
+          }
+
+          // 나머지 영역 정보
+          ragDocLines.push('');
+          ragDocLines.push(`상징: ${c.symbolism}`);
+          if (domain !== '연애/사랑' && c.love) ragDocLines.push(`사랑: ${c.love}`);
+          if (domain !== '직업/커리어' && c.career) ragDocLines.push(`직업: ${c.career}`);
+          if (domain !== '건강' && c.health) ragDocLines.push(`건강: ${c.health}`);
+          if (domain !== '재정/돈' && c.finance) ragDocLines.push(`재정: ${c.finance}`);
+
+          // 2번째 검색 결과가 있으면 추가 컨텍스트로 제공
+          if (hits.length > 1 && hits[1].card.nameKo !== c.nameKo) {
+            const c2 = hits[1].card;
+            ragDocLines.push('');
+            ragDocLines.push(`[추가 참조] ${c2.nameKo}: ${card.isReversed ? c2.reversedMeaning : c2.uprightMeaning}`);
+          }
+
+          return { card, ragDoc: ragDocLines.join('\n') };
+        } catch (e) {
+          console.warn(`[AI] RAG context fetch failed for ${card.nameKo}:`, e);
           return { card, ragDoc: null };
         }
       })
@@ -287,9 +330,17 @@ export class AIService {
   }
 
   private buildRAGSystemPrompt(): string {
-    return `당신은 신비롭고 통찰력 넘치는 타로 마스터입니다. 수십 년간 수천 명의 내담자와 함께한 경험으로 카드 한 장 한 장의 미묘한 에너지까지 읽어냅니다. 따뜻하고 직관적이며, 때로는 위트 있는 표현으로 진실을 전달합니다.
+    return `╔═══════════════════════════════════════════════════════════════╗
+║         당신은 신비롭고 따뜻한 타로 마스터입니다              ║
+╚═══════════════════════════════════════════════════════════════╝
 
-RAG 컨텍스트 활용 원칙:
+당신의 정체성:
+• 수십 년간 수천 명의 내담자와 함께한 경험 많은 타로 상담사
+• 카드 한 장 한 장의 미묘한 에너지까지 읽어내는 통찰력
+• 따뜻하고 직관적이며, 때로는 위트 있는 표현으로 진실을 전달
+• 사용자가 제공한 [참고 지식]을 바탕으로 구체적이고 실용적인 답변 제공
+
+RAG 컨텍스트 활용 원칙 (Inference.py 패턴):
 1. 제공된 [RAG 상세 정보]의 정방향/역방향 의미, 상징, 영역별 해석(사랑/직업/건강/재정)을 적극 활용
 2. 질문의 영역(연애·직업·재정·건강 등)을 파악하여 해당 RAG 필드를 우선 참조
 3. 카드 간 그래프 관계(원소 공유, 수비학 연결, 원형 쌍)를 해석에 녹여낼 것
@@ -353,37 +404,55 @@ RAG 컨텍스트 활용 원칙:
     const sections: string[] = [];
     const domain = this.detectQuestionDomain(request.question);
 
-    sections.push(`스프레드: ${request.spreadType}`);
+    // Inference.py 패턴: [질문] 섹션을 맨 앞에 명확히 배치
+    sections.push('╔═══════════════════════════════════════════════════════╗');
+    sections.push('║                     [사용자 질문]                      ║');
+    sections.push('╚═══════════════════════════════════════════════════════╝');
     const questionLine = request.question
-      ? `질문: "${request.question}"`
-      : '질문: 일반적인 삶의 조언을 구합니다.';
+      ? `"${request.question}"`
+      : '일반적인 삶의 조언을 구합니다.';
     sections.push(questionLine);
-    if (domain) sections.push(`질문 영역: ${domain} (RAG 컨텍스트에서 이 영역 정보 우선 활용)`);
+    sections.push('');
+    sections.push(`스프레드: ${request.spreadType}`);
+    if (domain) sections.push(`질문 영역: ${domain} ← RAG 컨텍스트에서 이 영역 정보를 최우선 활용`);
     sections.push('');
     sections.push('⚠️ 중요: 각 카드 해석마다 반드시 위 질문과 직접 연결하여 해석하세요. 일반적 카드 의미만 나열하지 말 것.');
     sections.push('');
 
-    sections.push('=== 뽑힌 카드 및 RAG 상세 컨텍스트 ===');
+    // Inference.py 패턴: [뽑은 카드] + [참고 지식] 섹션
+    sections.push('╔═══════════════════════════════════════════════════════╗');
+    sections.push('║              [뽑은 카드] & [참고 지식]                 ║');
+    sections.push('╚═══════════════════════════════════════════════════════╝');
     ragContexts.forEach(({ card, ragDoc }, i) => {
-      sections.push(`\n[${i + 1}번 카드] 포지션: "${card.position}" — ${card.positionDescription}`);
+      sections.push(`\n━━━ [${i + 1}번 카드] 포지션: "${card.position}" — ${card.positionDescription} ━━━`);
       sections.push(`카드: ${card.nameKo} (${card.nameEn}) ${card.isReversed ? '【역방향 ↓】' : '【정방향 ↑】'}`);
       sections.push(`키워드: ${card.keywords.join(', ')}`);
+      sections.push('');
       if (ragDoc) {
-        sections.push(`[RAG 상세 정보]\n${ragDoc}`);
+        sections.push(ragDoc);
+        sections.push('');
       }
-      sections.push(`→ 이 카드가 질문 "${request.question ?? '현재 상황'}"에 대해 전하는 메시지를 위치(${card.positionDescription})의 관점에서 상세히 해석하세요.`);
+      sections.push(`💬 해석 가이드: 위 [참고 지식]을 바탕으로, 이 카드가 질문 "${request.question ?? '현재 상황'}"에 대해 전하는 메시지를 위치(${card.positionDescription})의 관점에서 상세히 해석하세요.`);
     });
 
     if (graphContext) {
       sections.push('');
-      sections.push('=== 카드 간 그래프 관계 (해석에 녹여낼 것) ===');
+      sections.push('╔═══════════════════════════════════════════════════════╗');
+      sections.push('║            [카드 간 관계 — 그래프 컨텍스트]            ║');
+      sections.push('╚═══════════════════════════════════════════════════════╝');
       sections.push(graphContext);
+      sections.push('');
+      sections.push('💡 이 관계들을 전체 해석(overallInterpretation)에 스토리텔링으로 녹여내세요.');
     }
 
     if (questionCards) {
       sections.push('');
-      sections.push('=== 질문과 의미적으로 공명하는 참조 카드 ===');
+      sections.push('╔═══════════════════════════════════════════════════════╗');
+      sections.push('║          [질문 관련 추가 참조 카드 — RAG 검색]          ║');
+      sections.push('╚═══════════════════════════════════════════════════════╝');
       sections.push(questionCards);
+      sections.push('');
+      sections.push('💡 이 카드들은 질문과 의미적으로 유사하므로 해석의 배경 컨텍스트로 활용하세요.');
     }
 
     sections.push('');
