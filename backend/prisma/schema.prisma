@@ -42,6 +42,9 @@ model Card {
   career          String
   health          String
   finance         String
+  chunks          String?        // JSON: category-based meaning chunks for better RAG retrieval
+                                 // Format: [{"category":"general","upright":"...","reversed":"..."},
+                                 //          {"category":"love","upright":"...","reversed":"..."},...]
 
   readingCards ReadingCard[]
   userProgress UserProgress[]
