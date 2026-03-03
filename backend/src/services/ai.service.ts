@@ -217,7 +217,7 @@ export class AIService {
     }
   }
 
-  // 각 뽑힌 카드에 대한 Qdrant RAG 컨텍스트 조회 (Filtering.py 패턴 적용)
+  // 각 뽑힌 카드에 대한 Qdrant RAG 컨텍스트 조회 (Filtering.py + Reasoning.py 패턴 적용)
   private async fetchCardRAGContexts(
     cards: CardInput[],
     question?: string
@@ -234,8 +234,9 @@ export class AIService {
     const results = await Promise.all(
       cards.map(async (card) => {
         try {
-          // Inference.py 패턴: "{카드명} 카드가 나왔을 때, {질문}에 대한 해석은?"
-          const query = `${card.nameKo} 카드가 ${card.isReversed ? '역방향으로' : '정방향으로'} 나왔을 때, ${questionDomainHint}에 대한 해석은?`;
+          // Reasoning.py 패턴: Position 정보를 쿼리에 포함 (같은 카드도 위치에 따라 다른 해석)
+          const positionHint = card.position ? `${card.position} 위치에서` : '';
+          const query = `${card.nameKo} 카드가 ${positionHint} ${card.isReversed ? '역방향으로' : '정방향으로'} 나왔을 때, ${questionDomainHint}에 대한 해석은?`;
 
           // Filtering.py 패턴: 메타데이터 필터로 해당 카드만 검색 (다른 카드 섞이지 않도록)
           let hits = await ragService.hybridSearch(query, 2, {
@@ -348,6 +349,106 @@ export class AIService {
     }
   }
 
+  // Reasoning.py 패턴: 카드 간 '케미' 분석 (메이저 비율, 원소 분포, 수비학 패턴)
+  private analyzeCardChemistry(cards: CardInput[]): string {
+    const lines: string[] = [];
+
+    // 1. 메이저/마이너 비율 분석
+    const majorCount = cards.filter(c => !c.suit).length;
+    const minorCount = cards.length - majorCount;
+
+    if (majorCount > 0) {
+      const majorRatio = ((majorCount / cards.length) * 100).toFixed(0);
+      lines.push(`🎯 메이저 아르카나 ${majorCount}장 (${majorRatio}%) — 큰 전환점, 인생의 중요한 국면`);
+    }
+    if (minorCount > 0) {
+      const minorRatio = ((minorCount / cards.length) * 100).toFixed(0);
+      lines.push(`📅 마이너 아르카나 ${minorCount}장 (${minorRatio}%) — 일상적 사건, 세부적 흐름`);
+    }
+
+    // 2. 원소(Element) 분포 분석
+    const elementMap: Record<string, number> = { 불: 0, 물: 0, 공기: 0, 흙: 0 };
+    const suitToElement: Record<string, string> = {
+      WANDS: '불',
+      CUPS: '물',
+      SWORDS: '공기',
+      PENTACLES: '흙'
+    };
+
+    cards.forEach(card => {
+      if (card.suit && suitToElement[card.suit]) {
+        elementMap[suitToElement[card.suit]]++;
+      }
+    });
+
+    const totalElements = Object.values(elementMap).reduce((a, b) => a + b, 0);
+    if (totalElements > 0) {
+      lines.push('');
+      lines.push('🔥💧🌬️🌿 원소(Element) 에너지 분포:');
+
+      const elementDescriptions: Record<string, string> = {
+        불: '열정·행동·창의',
+        물: '감정·직관·흐름',
+        공기: '사고·소통·분석',
+        흙: '물질·안정·실행'
+      };
+
+      Object.entries(elementMap)
+        .filter(([_, count]) => count > 0)
+        .sort((a, b) => b[1] - a[1])
+        .forEach(([element, count]) => {
+          const percentage = ((count / totalElements) * 100).toFixed(0);
+          lines.push(`  • ${element} 원소 ${count}장 (${percentage}%) — ${elementDescriptions[element]}`);
+        });
+
+      // 지배 원소 감지 (50% 이상)
+      const dominantElement = Object.entries(elementMap).find(([_, count]) => count / totalElements >= 0.5);
+      if (dominantElement) {
+        lines.push('');
+        lines.push(`⚡ 지배 원소: ${dominantElement[0]} (${((dominantElement[1] / totalElements) * 100).toFixed(0)}%) — 이 스프레드는 ${dominantElement[0]} 에너지가 강하게 작용합니다`);
+      }
+    }
+
+    // 3. 수비학 패턴 분석 (같은 숫자 반복)
+    const numberMap: Record<number, string[]> = {};
+    cards.forEach(card => {
+      if (card.number !== undefined && card.number !== null) {
+        if (!numberMap[card.number]) numberMap[card.number] = [];
+        numberMap[card.number].push(card.nameKo);
+      }
+    });
+
+    const repeatedNumbers = Object.entries(numberMap).filter(([_, cards]) => cards.length >= 2);
+    if (repeatedNumbers.length > 0) {
+      lines.push('');
+      lines.push('🔢 수비학 패턴 (같은 숫자 반복):');
+      repeatedNumbers.forEach(([num, cardNames]) => {
+        const numInt = parseInt(num);
+        const meaning = this.getNumerologyMeaning(numInt);
+        lines.push(`  • 숫자 ${num} (${cardNames.join(', ')}) — ${meaning}`);
+      });
+    }
+
+    return lines.length > 0 ? lines.join('\n') : '';
+  }
+
+  // 수비학 의미 헬퍼
+  private getNumerologyMeaning(num: number): string {
+    const meanings: Record<number, string> = {
+      1: '새로운 시작, 창조, 잠재력',
+      2: '균형, 선택, 파트너십',
+      3: '성장, 확장, 표현',
+      4: '안정, 구조, 기초',
+      5: '변화, 도전, 갈등',
+      6: '조화, 회복, 균형',
+      7: '성찰, 평가, 내면',
+      8: '힘, 움직임, 달성',
+      9: '완성, 성숙, 전환',
+      10: '완결, 순환의 끝, 새 시작 준비'
+    };
+    return meanings[num] || '특별한 의미';
+  }
+
   // 질문을 벡터 검색하여 관련 카드 컨텍스트 조회 (Filtering.py: 시맨틱 검색)
   private async fetchQuestionRAGCards(question?: string): Promise<string | null> {
     if (!question || !ragService.isInitialized()) return null;
@@ -455,11 +556,11 @@ RAG 컨텍스트 활용 원칙:
 반드시 아래 JSON 형식으로만 응답하세요:
 {
   "questionAnswer": "질문에 대한 핵심 답변 — RAG 컨텍스트의 해당 영역 의미를 근거로 구체적이고 따뜻하게 (230-310자)",
-  "overallInterpretation": "스프레드 전체의 에너지 흐름 — 그래프 관계(원소/수비학/원형 쌍)를 녹여 카드들이 하나의 이야기를 만들도록 스토리텔링 (370-480자)",
+  "overallInterpretation": "스프레드 전체의 에너지 흐름 — 케미 분석(메이저/원소/수비학) + 그래프 관계를 녹여 카드들이 하나의 이야기를 만들도록 스토리텔링. position별 흐름(과거→현재→미래) 반드시 명시 (370-500자)",
   "cardInterpretations": [
-    { "position": "위치명", "interpretation": "① 카드 이미지와 상징을 생생히 묘사 (60-80자) ② 마이너 아르카나라면 이 숫자/인물 단계를 위 비유 방식으로 재미있게 설명 — 예: 컵의 4라면 '물(감정)이 4단계, 네 기둥이 세워진 안정의 시간에 왔어요...' (90-130자) ③ 이 포지션에서 카드가 전하는 메시지 (70-100자) ④ 질문에 어떻게 직접 답하는지 구체적으로 (90-120자) ⑤ 실질적 통찰이나 경고 (70-90자). 총 420-530자" }
+    { "position": "위치명", "interpretation": "① 카드 이미지와 상징을 생생히 묘사 (60-80자) ② 마이너 아르카나라면 이 숫자/인물 단계를 위 비유 방식으로 재미있게 설명 — 예: 컵의 4라면 '물(감정)이 4단계, 네 기둥이 세워진 안정의 시간에 왔어요...' (90-130자) ③ 이 **position(위치)**에서 카드가 전하는 메시지 — 같은 카드도 위치에 따라 의미가 다름! (80-110자) ④ 질문에 어떻게 직접 답하는지 구체적으로 (90-120자) ⑤ 실질적 통찰이나 경고 (70-90자). 총 420-550자" }
   ],
-  "conclusion": "【종합 조언 섹션 — 반드시 아래 4파트 모두 포함, 총 450-650자】\\n🔮 카드들이 전하는 핵심 메시지 (100-130자): 이 스프레드 전체가 말하는 가장 중요한 한 가지\\n\\n✨ 지금 당장 실천할 행동 조언 3가지 (각 60-80자): 구체적이고 실행 가능한 것들, 번호로 구분\\n\\n⚠️ 주의할 점 (60-90자): 카드가 경고하는 것, 피해야 할 함정\\n\\n💌 마음에 새길 격려 메시지 (90-120자): 따뜻하고 힘이 되는 마무리"
+  "conclusion": "【종합 조언 섹션 — 반드시 아래 5파트 모두 포함, Reasoning.py 패턴】\\n💎 한 줄 요약 조언 (50-70자): 이 리딩의 핵심을 한 문장으로 압축한 행운의 메시지\\n\\n🔮 카드들이 전하는 핵심 메시지 (100-130자): 이 스프레드 전체가 말하는 가장 중요한 한 가지\\n\\n✨ 지금 당장 실천할 행동 조언 3가지 (각 60-80자): 구체적이고 실행 가능한 것들, 번호로 구분\\n\\n⚠️ 주의할 점 (60-90자): 카드가 경고하는 것, 피해야 할 함정\\n\\n💌 마음에 새길 격려 메시지 (90-120자): 따뜻하고 힘이 되는 마무리"
 }`;
   }
 
@@ -559,6 +660,18 @@ RAG 컨텍스트 활용 원칙:
       sections.push(`💬 해석 가이드: 위 [참고 지식]을 바탕으로, 이 카드가 질문 "${request.question ?? '현재 상황'}"에 대해 전하는 메시지를 위치(${card.positionDescription})의 관점에서 상세히 해석하세요.`);
     });
 
+    // Reasoning.py 패턴: 카드 간 '케미' 분석 (메이저 비율, 원소 분포, 수비학 패턴)
+    const chemistryAnalysis = this.analyzeCardChemistry(ragContexts.map(r => r.card));
+    if (chemistryAnalysis) {
+      sections.push('');
+      sections.push('╔═══════════════════════════════════════════════════════╗');
+      sections.push('║         [카드 간 케미 분석 — Reasoning.py 패턴]        ║');
+      sections.push('╚═══════════════════════════════════════════════════════╝');
+      sections.push(chemistryAnalysis);
+      sections.push('');
+      sections.push('💡 이 케미 정보를 overallInterpretation에 반영하세요. 예: "물 원소가 지배적이므로 감정과 직관이 중요합니다"');
+    }
+
     if (graphContext) {
       sections.push('');
       sections.push('╔═══════════════════════════════════════════════════════╗');
@@ -588,16 +701,35 @@ RAG 컨텍스트 활용 원칙:
     sections.push(`💬 질문 연결: "${request.question ?? '현재 상황'}"에 각 카드가 어떻게 답하는지 명확히 연결`);
     sections.push('');
 
-    // 멀티 카드 흐름 강조 (Retrieve.py 패턴)
-    if (ragContexts.length >= 3) {
-      sections.push('🌊 **멀티 카드 흐름 연결 (Retrieve.py 패턴):**');
+    // 멀티 카드 흐름 강조 (Reasoning.py 패턴 강화)
+    if (ragContexts.length >= 2) {
+      sections.push('🌊 **멀티 카드 에너지 흐름 연결 (Reasoning.py 패턴):**');
       sections.push(`   ${ragContexts.length}장의 카드를 단독으로 해석하지 말고, 전체 흐름을 유기적으로 연결하세요!`);
       sections.push('');
       const positions = ragContexts.map(r => r.card.position).join(' → ');
-      sections.push(`   예시 흐름: "${positions}"`);
-      sections.push(`   → 첫 카드(${ragContexts[0].card.position})가 보여준 에너지가 → 둘째 카드(${ragContexts[1].card.position})의 상황으로 이어지고 → 셋째 카드(${ragContexts[2].card.position})의 결과로 귀결됩니다`);
-      sections.push('   → **스토리텔링**: 마치 하나의 드라마처럼 엮어서 전달하세요');
-      sections.push('   → overallInterpretation에서 반드시 전체 흐름을 명시하세요');
+      sections.push(`   📍 흐름 구조: "${positions}"`);
+      sections.push('');
+
+      if (ragContexts.length >= 3) {
+        sections.push(`   ✨ 에너지 흐름 예시:`);
+        sections.push(`      "${ragContexts[0].card.nameKo} (${ragContexts[0].card.position})"가 보여준 에너지가`);
+        sections.push(`      → "${ragContexts[1].card.nameKo} (${ragContexts[1].card.position})"의 상황으로 이어지고`);
+        sections.push(`      → "${ragContexts[2].card.nameKo} (${ragContexts[2].card.position})"의 결과/조언으로 귀결됩니다`);
+      } else {
+        sections.push(`   ✨ 에너지 흐름 예시:`);
+        sections.push(`      "${ragContexts[0].card.nameKo} (${ragContexts[0].card.position})"에서 시작한 에너지가`);
+        sections.push(`      → "${ragContexts[1].card.nameKo} (${ragContexts[1].card.position})"로 전개됩니다`);
+      }
+      sections.push('');
+
+      sections.push('   🎭 스토리텔링 원칙:');
+      sections.push('      1. 각 카드의 의미를 먼저 짧게 설명');
+      sections.push('      2. 과거→현재→미래 (또는 상황→장애→결과) 흐름 중심으로 종합 이야기 구성');
+      sections.push('      3. 카드들 사이에 모순이 있다면 → 그것을 극복하기 위한 조언으로 풀어서 설명');
+      sections.push('      4. overallInterpretation에서 반드시 전체 흐름을 명시');
+      sections.push('');
+      sections.push('   ⚠️ 중요: 각 카드의 **position(위치)** 의미를 해석에 반드시 반영하세요!');
+      sections.push(`      예: 같은 "달" 카드라도 "과거" 자리에 있으면 "지나간 혼란", "미래" 자리에 있으면 "다가올 불확실성"으로 해석이 달라집니다`);
       sections.push('');
     }
 
