@@ -167,8 +167,8 @@ class TarotRAGService {
     const info = await this.qdrant.getCollection(COLLECTION_NAME);
     this.cardCount = info.points_count ?? 0;
 
-    // Fit BM25 on all card documents (even if already indexed)
-    if (this.cardCount === 0) {
+    // Fit BM25 on all card documents for query-time use (lightweight operation)
+    if (this.cardCount > 0) {
       await this.fitBM25();
     }
 
@@ -366,6 +366,14 @@ class TarotRAGService {
 
   isInitialized(): boolean { return this.initialized; }
   getCardCount(): number { return this.cardCount; }
+
+  getStatus(): { initialized: boolean; cardCount: number; hasData: boolean } {
+    return {
+      initialized: this.initialized,
+      cardCount: this.cardCount,
+      hasData: this.cardCount >= 78
+    };
+  }
 }
 
 export const ragService = new TarotRAGService();

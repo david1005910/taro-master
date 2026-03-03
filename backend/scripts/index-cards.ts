@@ -1,8 +1,17 @@
 /**
- * 일회성 타로 카드 RAG 인덱싱 스크립트
- * 실행: npx ts-node scripts/index-cards.ts
+ * 타로 카드 RAG 인덱싱 스크립트
  *
- * Gemini text-embedding-004 (768 dim) — rate limit 여유로움
+ * 용도: 타로 카드 해석 데이터를 벡터화하여 Qdrant에 저장
+ * 실행 시점:
+ *   1. 최초 1회 (데이터베이스 시드 후)
+ *   2. 카드 데이터 업데이트 시
+ *   3. chunks 구조 변경 시
+ *
+ * 실행 방법:
+ *   npx ts-node scripts/index-cards.ts           # 자동 체크 (이미 인덱싱된 경우 건너뜀)
+ *   npx ts-node scripts/index-cards.ts --force   # 강제 재인덱싱
+ *
+ * 주의: Gemini 임베딩은 무료 티어 제한(~100 RPM)으로 인해 78장 완료에 ~2분 소요
  */
 import dotenv from 'dotenv';
 dotenv.config();
@@ -79,20 +88,28 @@ class BM25Vectorizer {
 }
 
 async function main() {
-  console.log('=== 타로 카드 RAG 인덱싱 (Gemini text-embedding-004) ===\n');
+  const forceReindex = process.argv.includes('--force');
+
+  console.log('=== 타로 카드 RAG 인덱싱 (Gemini gemini-embedding-001) ===\n');
 
   await qdrant.versionInfo();
   console.log('✓ Qdrant 연결 성공');
 
-  // 컬렉션 초기화 (차원 변경으로 재생성)
+  // 컬렉션 존재 여부 확인
   const exists = await qdrant.collectionExists(COLLECTION_NAME);
-  if (exists.exists) {
+  if (exists.exists && !forceReindex) {
     const info = await qdrant.getCollection(COLLECTION_NAME);
     const count = info.points_count ?? 0;
     if (count >= 78) {
       console.log(`✓ 이미 인덱싱 완료 (${count}개 카드)`);
-      await prisma.$disconnect(); return;
+      console.log('💡 강제 재인덱싱: npx ts-node scripts/index-cards.ts --force\n');
+      await prisma.$disconnect();
+      return;
     }
+  }
+
+  // 강제 재인덱싱 시 기존 컬렉션 삭제
+  if (exists.exists) {
     await qdrant.deleteCollection(COLLECTION_NAME);
     console.log('- 기존 컬렉션 삭제 (재생성)');
   }

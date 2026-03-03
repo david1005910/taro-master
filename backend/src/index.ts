@@ -6,11 +6,16 @@ import prisma from './utils/prisma';
 
 const PORT = config.PORT;
 
-// RAG 초기화 (비동기)
+// RAG 초기화 (비동기) — 연결만 확인, 인덱싱은 별도 스크립트로
 async function initializeRAG() {
   try {
     await ragService.initialize();
-    await ragService.indexAllCards();
+    const status = ragService.getStatus();
+    if (status.cardCount >= 78) {
+      console.log(`[RAG] ${status.cardCount} cards already indexed, skipping`);
+    } else {
+      console.log('[RAG] 카드가 인덱싱되지 않음 — 실행: npx ts-node scripts/index-cards.ts');
+    }
     console.log('[RAG] Qdrant initialized with tarot cards');
   } catch (error: any) {
     console.log('[RAG] Initialization skipped:', error.message);
