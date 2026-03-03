@@ -184,7 +184,7 @@ export class AIService {
         generationConfig: {
           responseMimeType: 'application/json',
           temperature: 0.8,
-          maxOutputTokens: 6000
+          maxOutputTokens: 8000  // 증가: 6000 → 8000 (답변 잘림 방지)
         }
       });
 
@@ -802,7 +802,7 @@ ${contextLines.join('\n')}
         model: 'gemini-2.5-flash',
         generationConfig: {
           temperature: 0.8,
-          maxOutputTokens: 1000
+          maxOutputTokens: 2000  // 증가: 1000 → 2000 (채팅 답변 잘림 방지)
         }
       });
 

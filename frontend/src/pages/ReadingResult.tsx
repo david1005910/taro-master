@@ -378,7 +378,7 @@ const ReadingResult = () => {
 
           {/* Message List */}
           {chatMessages.length > 0 && (
-            <div className="space-y-3 mb-4 max-h-80 overflow-y-auto pr-1">
+            <div className="space-y-3 mb-4 max-h-[600px] overflow-y-auto pr-1">
               {chatMessages.map((msg, i) => (
                 <div
                   key={i}
