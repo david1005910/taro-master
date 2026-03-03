@@ -1,11 +1,11 @@
-import Anthropic from '@anthropic-ai/sdk';
+import { GoogleGenerativeAI } from '@google/generative-ai';
 import { config } from '../config/env';
 import { ragService } from './rag.service';
 import { neo4jGraphService } from './neo4j.service';
 
 // API 키가 설정되지 않은 경우 null로 설정
-const client = config.CLAUDE_API_KEY && config.CLAUDE_API_KEY !== 'your-claude-api-key-here'
-  ? new Anthropic({ apiKey: config.CLAUDE_API_KEY })
+const genAI = config.GEMINI_API_KEY && config.GEMINI_API_KEY !== 'your-gemini-api-key-here'
+  ? new GoogleGenerativeAI(config.GEMINI_API_KEY)
   : null;
 
 interface CardInput {
@@ -107,47 +107,50 @@ export class AIService {
 }`;
 
   async interpret(request: InterpretRequest): Promise<InterpretResponse> {
-    if (!client) {
-      console.error('[AI Service] Claude API key is not configured');
+    if (!genAI) {
+      console.error('[AI Service] Gemini API key is not configured');
       throw {
         status: 503,
         code: 'AI_SERVICE_NOT_CONFIGURED',
-        message: 'AI 서비스가 설정되지 않았습니다. .env 파일에 CLAUDE_API_KEY를 설정해주세요.'
+        message: 'AI 서비스가 설정되지 않았습니다. .env 파일에 GEMINI_API_KEY를 설정해주세요.'
       };
     }
 
     const userPrompt = this.buildUserPrompt(request);
 
     try {
-      const response = await client.messages.create({
-        model: 'claude-sonnet-4-20250514',
-        max_tokens: 5000,
-        system: this.systemPrompt,
-        messages: [{ role: 'user', content: userPrompt }]
+      const model = genAI.getGenerativeModel({
+        model: 'gemini-2.0-flash',
+        generationConfig: {
+          responseMimeType: 'application/json',
+          temperature: 0.8,
+          maxOutputTokens: 5000
+        }
       });
 
-      const content = response.content[0];
-      if (content.type !== 'text') {
-        throw new Error('Unexpected response type');
-      }
+      const result = await model.generateContent({
+        contents: [{ role: 'user', parts: [{ text: userPrompt }] }],
+        systemInstruction: this.systemPrompt
+      });
 
-      const parsed = safeParseJSON(content.text);
+      const responseText = result.response.text();
+      const parsed = safeParseJSON(responseText);
+
       if (!parsed) {
-        console.error('[AI Service] JSON parse failed. Raw response:', content.text.slice(0, 200));
+        console.error('[AI Service] JSON parse failed. Raw response:', responseText.slice(0, 200));
         throw new Error('No valid JSON found in response');
       }
 
       return parsed;
     } catch (error: any) {
       console.error('[AI Service] Error:', error.message || error);
-      if (error.status === 401) {
+
+      // Gemini API error handling
+      if (error.message?.includes('API_KEY_INVALID') || error.message?.includes('invalid API key')) {
         throw { status: 503, code: 'AI_SERVICE_AUTH_ERROR', message: 'AI API 인증에 실패했습니다. API 키를 확인해주세요.' };
       }
-      if (error.status === 429) {
+      if (error.message?.includes('RATE_LIMIT_EXCEEDED') || error.message?.includes('quota')) {
         throw { status: 503, code: 'AI_SERVICE_RATE_LIMIT', message: 'AI 서비스 요청 한도를 초과했습니다. 잠시 후 다시 시도해주세요.' };
-      }
-      if (error.status === 400 && (error.message?.includes('credit balance') || error.message?.includes('billing'))) {
-        throw { status: 503, code: 'AI_CREDIT_DEPLETED', message: 'Claude API 크레딧이 부족합니다. Plans & Billing에서 크레딧을 충전해주세요.' };
       }
       if (error.code) throw error;
       throw { status: 500, code: 'AI_INTERPRETATION_FAILED', message: 'AI 해석에 실패했습니다. 잠시 후 다시 시도해주세요.' };
@@ -156,12 +159,12 @@ export class AIService {
 
   // RAG 컨텍스트 기반 강화 해석 (Qdrant 카드 시맨틱 검색)
   async interpretWithRAG(request: InterpretRequest): Promise<InterpretResponse> {
-    if (!client) {
-      console.error('[AI Service] Claude API key is not configured');
+    if (!genAI) {
+      console.error('[AI Service] Gemini API key is not configured');
       throw {
         status: 503,
         code: 'AI_SERVICE_NOT_CONFIGURED',
-        message: 'AI 서비스가 설정되지 않았습니다. .env 파일에 CLAUDE_API_KEY를 설정해주세요.'
+        message: 'AI 서비스가 설정되지 않았습니다. .env 파일에 GEMINI_API_KEY를 설정해주세요.'
       };
     }
 
@@ -175,35 +178,38 @@ export class AIService {
     const userPrompt = this.buildRAGUserPrompt(request, ragCardContexts, questionRagCards, graphContext);
 
     try {
-      const response = await client.messages.create({
-        model: 'claude-sonnet-4-20250514',
-        max_tokens: 6000,
-        system: this.buildRAGSystemPrompt(),
-        messages: [{ role: 'user', content: userPrompt }]
+      const model = genAI.getGenerativeModel({
+        model: 'gemini-2.0-flash',
+        generationConfig: {
+          responseMimeType: 'application/json',
+          temperature: 0.8,
+          maxOutputTokens: 6000
+        }
       });
 
-      const content = response.content[0];
-      if (content.type !== 'text') {
-        throw new Error('Unexpected response type');
-      }
+      const result = await model.generateContent({
+        contents: [{ role: 'user', parts: [{ text: userPrompt }] }],
+        systemInstruction: this.buildRAGSystemPrompt()
+      });
 
-      const parsed = safeParseJSON(content.text);
+      const responseText = result.response.text();
+      const parsed = safeParseJSON(responseText);
+
       if (!parsed) {
-        console.error('[AI Service] JSON parse failed. Raw response:', content.text.slice(0, 200));
+        console.error('[AI Service] JSON parse failed. Raw response:', responseText.slice(0, 200));
         throw new Error('No valid JSON found in response');
       }
 
       return parsed;
     } catch (error: any) {
       console.error('[AI Service] RAG interpret error:', error.message || error);
-      if (error.status === 401) {
+
+      // Gemini API error handling
+      if (error.message?.includes('API_KEY_INVALID') || error.message?.includes('invalid API key')) {
         throw { status: 503, code: 'AI_SERVICE_AUTH_ERROR', message: 'AI API 인증에 실패했습니다. API 키를 확인해주세요.' };
       }
-      if (error.status === 429) {
+      if (error.message?.includes('RATE_LIMIT_EXCEEDED') || error.message?.includes('quota')) {
         throw { status: 503, code: 'AI_SERVICE_RATE_LIMIT', message: 'AI 서비스 요청 한도를 초과했습니다. 잠시 후 다시 시도해주세요.' };
-      }
-      if (error.status === 400 && (error.message?.includes('credit balance') || error.message?.includes('billing'))) {
-        throw { status: 503, code: 'AI_CREDIT_DEPLETED', message: 'Claude API 크레딧이 부족합니다. Plans & Billing에서 크레딧을 충전해주세요.' };
       }
       if (error.code) throw error;
       throw { status: 500, code: 'AI_INTERPRETATION_FAILED', message: 'AI 해석에 실패했습니다. 잠시 후 다시 시도해주세요.' };
@@ -389,7 +395,7 @@ RAG 컨텍스트 활용 원칙:
 
   // 챗봇 후속 질문 처리
   async chat(request: ChatRequest): Promise<ChatResponse> {
-    if (!client) {
+    if (!genAI) {
       throw {
         status: 503,
         code: 'AI_SERVICE_NOT_CONFIGURED',
@@ -439,34 +445,39 @@ ${contextLines.join('\n')}
 4. 100-300자 내외로 간결하게 답변
 5. 한국어로 응답`;
 
-    const messages: Anthropic.Messages.MessageParam[] = [
+    // Gemini 대화 형식으로 변환
+    const contents = [
       ...(request.history ?? []).map(m => ({
-        role: m.role as 'user' | 'assistant',
-        content: m.content
+        role: m.role === 'user' ? 'user' as const : 'model' as const,
+        parts: [{ text: m.content }]
       })),
-      { role: 'user', content: request.message }
+      { role: 'user' as const, parts: [{ text: request.message }] }
     ];
 
     try {
-      const response = await client.messages.create({
-        model: 'claude-sonnet-4-20250514',
-        max_tokens: 1000,
-        system: systemPrompt,
-        messages
+      const model = genAI.getGenerativeModel({
+        model: 'gemini-2.0-flash',
+        generationConfig: {
+          temperature: 0.8,
+          maxOutputTokens: 1000
+        }
       });
 
-      const content = response.content[0];
-      if (content.type !== 'text') {
-        throw new Error('Unexpected response type');
-      }
+      const result = await model.generateContent({
+        contents,
+        systemInstruction: systemPrompt
+      });
 
-      return { reply: content.text };
+      const reply = result.response.text();
+      return { reply };
     } catch (error: any) {
       console.error('[AI Service] Chat error:', error.message || error);
-      if (error.status === 401) {
+
+      // Gemini error handling
+      if (error.message?.includes('API_KEY_INVALID') || error.message?.includes('invalid API key')) {
         throw { status: 503, code: 'AI_SERVICE_AUTH_ERROR', message: 'AI API 인증에 실패했습니다.' };
       }
-      if (error.status === 429) {
+      if (error.message?.includes('RATE_LIMIT_EXCEEDED') || error.message?.includes('quota')) {
         throw { status: 503, code: 'AI_SERVICE_RATE_LIMIT', message: 'AI 서비스 요청 한도를 초과했습니다.' };
       }
       if (error.code) throw error;
