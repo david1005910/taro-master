@@ -89,11 +89,6 @@ const Home = () => {
               icon: '📝',
               title: '리딩 기록',
               description: '모든 리딩 기록을 저장하고 되돌아보며 성찰의 시간을 가지세요.'
-            },
-            {
-              icon: '🔗',
-              title: '사주 × 타로 융합',
-              description: '동양의 사주팔자와 서양의 타로를 연결하여 깊은 통찰을 얻으세요.'
             }
           ].map((feature, index) => (
             <motion.div

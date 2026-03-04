@@ -1,10 +1,16 @@
+import Anthropic from '@anthropic-ai/sdk';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { config } from '../config/env';
 import { ragService } from './rag.service';
 import { neo4jGraphService } from './neo4j.service';
 import prisma from '../utils/prisma';
 
-// API 키가 설정되지 않은 경우 null로 설정
+// Claude API 클라이언트 초기화
+const anthropic = config.CLAUDE_API_KEY && config.CLAUDE_API_KEY !== 'your-claude-api-key-here'
+  ? new Anthropic({ apiKey: config.CLAUDE_API_KEY })
+  : null;
+
+// Gemini는 임베딩용으로만 유지
 const genAI = config.GEMINI_API_KEY && config.GEMINI_API_KEY !== 'your-gemini-api-key-here'
   ? new GoogleGenerativeAI(config.GEMINI_API_KEY)
   : null;
@@ -108,33 +114,29 @@ export class AIService {
 }`;
 
   async interpret(request: InterpretRequest): Promise<InterpretResponse> {
-    if (!genAI) {
-      console.error('[AI Service] Gemini API key is not configured');
+    if (!anthropic) {
+      console.error('[AI Service] Claude API key is not configured');
       throw {
         status: 503,
         code: 'AI_SERVICE_NOT_CONFIGURED',
-        message: 'AI 서비스가 설정되지 않았습니다. .env 파일에 GEMINI_API_KEY를 설정해주세요.'
+        message: 'AI 서비스가 설정되지 않았습니다. .env 파일에 CLAUDE_API_KEY를 설정해주세요.'
       };
     }
 
     const userPrompt = this.buildUserPrompt(request);
 
     try {
-      const model = genAI.getGenerativeModel({
-        model: 'gemini-2.5-flash',
-        generationConfig: {
-          responseMimeType: 'application/json',
-          temperature: 0.8,
-          maxOutputTokens: 3000  // 5000 → 3000 (속도 40% 향상)
-        }
+      const message = await anthropic.messages.create({
+        model: 'claude-haiku-4-5-20251001',  // Haiku 4.5 - 빠르고 비용 효율적
+        max_tokens: 3000,
+        temperature: 0.8,
+        system: this.systemPrompt,
+        messages: [
+          { role: 'user', content: userPrompt }
+        ]
       });
 
-      const result = await model.generateContent({
-        contents: [{ role: 'user', parts: [{ text: userPrompt }] }],
-        systemInstruction: this.systemPrompt
-      });
-
-      const responseText = result.response.text();
+      const responseText = message.content[0].type === 'text' ? message.content[0].text : '';
       const parsed = safeParseJSON(responseText);
 
       if (!parsed) {
@@ -146,11 +148,11 @@ export class AIService {
     } catch (error: any) {
       console.error('[AI Service] Error:', error.message || error);
 
-      // Gemini API error handling
-      if (error.message?.includes('API_KEY_INVALID') || error.message?.includes('invalid API key')) {
+      // Claude API error handling
+      if (error.status === 401 || error.message?.includes('invalid API key')) {
         throw { status: 503, code: 'AI_SERVICE_AUTH_ERROR', message: 'AI API 인증에 실패했습니다. API 키를 확인해주세요.' };
       }
-      if (error.message?.includes('RATE_LIMIT_EXCEEDED') || error.message?.includes('quota')) {
+      if (error.status === 429 || error.message?.includes('rate limit')) {
         throw { status: 503, code: 'AI_SERVICE_RATE_LIMIT', message: 'AI 서비스 요청 한도를 초과했습니다. 잠시 후 다시 시도해주세요.' };
       }
       if (error.code) throw error;
@@ -160,12 +162,12 @@ export class AIService {
 
   // RAG 컨텍스트 기반 강화 해석 (Qdrant 카드 시맨틱 검색)
   async interpretWithRAG(request: InterpretRequest): Promise<InterpretResponse> {
-    if (!genAI) {
-      console.error('[AI Service] Gemini API key is not configured');
+    if (!anthropic) {
+      console.error('[AI Service] Claude API key is not configured');
       throw {
         status: 503,
         code: 'AI_SERVICE_NOT_CONFIGURED',
-        message: 'AI 서비스가 설정되지 않았습니다. .env 파일에 GEMINI_API_KEY를 설정해주세요.'
+        message: 'AI 서비스가 설정되지 않았습니다. .env 파일에 CLAUDE_API_KEY를 설정해주세요.'
       };
     }
 
@@ -179,21 +181,17 @@ export class AIService {
     const userPrompt = this.buildRAGUserPrompt(request, ragCardContexts, questionRagCards, graphContext);
 
     try {
-      const model = genAI.getGenerativeModel({
-        model: 'gemini-2.5-flash',
-        generationConfig: {
-          responseMimeType: 'application/json',
-          temperature: 0.8,
-          maxOutputTokens: 4000  // 속도 최적화: 8000 → 4000 (50% 빠름)
-        }
+      const message = await anthropic.messages.create({
+        model: 'claude-haiku-4-5-20251001',  // Haiku 4.5 - 빠르고 비용 효율적
+        max_tokens: 4000,
+        temperature: 0.8,
+        system: this.buildRAGSystemPrompt(),
+        messages: [
+          { role: 'user', content: userPrompt }
+        ]
       });
 
-      const result = await model.generateContent({
-        contents: [{ role: 'user', parts: [{ text: userPrompt }] }],
-        systemInstruction: this.buildRAGSystemPrompt()
-      });
-
-      const responseText = result.response.text();
+      const responseText = message.content[0].type === 'text' ? message.content[0].text : '';
       const parsed = safeParseJSON(responseText);
 
       if (!parsed) {
@@ -724,7 +722,7 @@ RAG 컨텍스트 활용 원칙:
 
   // 챗봇 후속 질문 처리
   async chat(request: ChatRequest): Promise<ChatResponse> {
-    if (!genAI) {
+    if (!anthropic) {
       throw {
         status: 503,
         code: 'AI_SERVICE_NOT_CONFIGURED',
@@ -774,39 +772,34 @@ ${contextLines.join('\n')}
 4. 100-300자 내외로 간결하게 답변
 5. 한국어로 응답`;
 
-    // Gemini 대화 형식으로 변환
-    const contents = [
+    // Claude 대화 형식으로 변환
+    const messages = [
       ...(request.history ?? []).map(m => ({
-        role: m.role === 'user' ? 'user' as const : 'model' as const,
-        parts: [{ text: m.content }]
+        role: m.role as 'user' | 'assistant',
+        content: m.content
       })),
-      { role: 'user' as const, parts: [{ text: request.message }] }
+      { role: 'user' as const, content: request.message }
     ];
 
     try {
-      const model = genAI.getGenerativeModel({
-        model: 'gemini-2.5-flash',
-        generationConfig: {
-          temperature: 0.8,
-          maxOutputTokens: 2000  // 증가: 1000 → 2000 (채팅 답변 잘림 방지)
-        }
+      const message = await anthropic.messages.create({
+        model: 'claude-haiku-4-5-20251001',  // Haiku 4.5 - 빠른 채팅 응답
+        max_tokens: 2000,
+        temperature: 0.8,
+        system: systemPrompt,
+        messages
       });
 
-      const result = await model.generateContent({
-        contents,
-        systemInstruction: systemPrompt
-      });
-
-      const reply = result.response.text();
+      const reply = message.content[0].type === 'text' ? message.content[0].text : '';
       return { reply };
     } catch (error: any) {
       console.error('[AI Service] Chat error:', error.message || error);
 
-      // Gemini error handling
-      if (error.message?.includes('API_KEY_INVALID') || error.message?.includes('invalid API key')) {
+      // Claude error handling
+      if (error.status === 401 || error.message?.includes('invalid API key')) {
         throw { status: 503, code: 'AI_SERVICE_AUTH_ERROR', message: 'AI API 인증에 실패했습니다.' };
       }
-      if (error.message?.includes('RATE_LIMIT_EXCEEDED') || error.message?.includes('quota')) {
+      if (error.status === 429 || error.message?.includes('rate limit')) {
         throw { status: 503, code: 'AI_SERVICE_RATE_LIMIT', message: 'AI 서비스 요청 한도를 초과했습니다.' };
       }
       if (error.code) throw error;
