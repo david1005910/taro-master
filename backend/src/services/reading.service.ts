@@ -263,14 +263,12 @@ export class ReadingService {
     let isNew = false;
 
     if (!dailyCard) {
-      // 새로운 카드 생성
+      // 새로운 카드 생성 (skip으로 임의 카드 선택 — ID 연속성 무관)
       const totalCards = await prisma.card.count();
-      const randomCardId = Math.floor(Math.random() * totalCards) + 1;
+      const skip = Math.floor(Math.random() * totalCards);
       const isReversed = Math.random() < 0.5;
 
-      const card = await prisma.card.findUnique({
-        where: { id: randomCardId }
-      });
+      const card = await prisma.card.findFirst({ skip });
 
       if (!card) {
         throw { status: 500, code: 'INTERNAL_ERROR', message: '카드를 불러올 수 없습니다.' };
@@ -289,7 +287,7 @@ export class ReadingService {
       dailyCard = await prisma.dailyCard.create({
         data: {
           userId,
-          cardId: randomCardId,
+          cardId: card.id,
           date: today,
           isReversed,
           message

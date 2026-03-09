@@ -435,3 +435,113 @@ class TarotRAGService {
 }
 
 export const ragService = new TarotRAGService();
+
+// ─── 타로심리상담사 교안 RAG 서비스 ────────────────────────────────────────────
+
+const COUNSELING_COLLECTION = 'tarot_counseling';
+
+export interface CounselingSearchResult {
+  lecture: string;
+  page: number;
+  text: string;
+  source: string;
+  score: number;
+}
+
+class CounselingRAGService {
+  private qdrant: QdrantClient;
+  private embedModel: ReturnType<GoogleGenerativeAI['getGenerativeModel']> | null = null;
+  private bm25 = new BM25Vectorizer();
+  private initialized = false;
+  private chunkCount = 0;
+
+  constructor() {
+    this.qdrant = new QdrantClient({ url: config.QDRANT_URL });
+    if (config.GEMINI_API_KEY) {
+      const genai = new GoogleGenerativeAI(config.GEMINI_API_KEY);
+      this.embedModel = genai.getGenerativeModel({ model: 'gemini-embedding-001' });
+    }
+  }
+
+  async initialize(): Promise<void> {
+    try {
+      await this.qdrant.versionInfo();
+      const exists = await this.qdrant.collectionExists(COUNSELING_COLLECTION);
+      if (!exists.exists) {
+        console.log(`[Counseling RAG] 컬렉션 '${COUNSELING_COLLECTION}' 없음 — index-counseling.ts 스크립트를 실행하세요.`);
+        return;
+      }
+      const info = await this.qdrant.getCollection(COUNSELING_COLLECTION);
+      this.chunkCount = info.points_count ?? 0;
+      if (this.chunkCount > 0) {
+        // BM25 fit: 컬렉션에서 샘플 텍스트 가져와서 fit
+        const sample = await this.qdrant.scroll(COUNSELING_COLLECTION, {
+          limit: 500,
+          with_payload: true,
+          with_vector: false
+        });
+        const texts = sample.points.map(p => (p.payload as any)?.text as string).filter(Boolean);
+        if (texts.length > 0) this.bm25.fit(texts);
+        this.initialized = true;
+        console.log(`[Counseling RAG] 초기화 완료 — ${this.chunkCount}개 청크`);
+      }
+    } catch (e) {
+      console.warn('[Counseling RAG] 초기화 실패 (Qdrant 미실행?):', (e as Error).message);
+    }
+  }
+
+  private async embedQuery(query: string): Promise<number[]> {
+    if (!this.embedModel) throw new Error('Gemini embed model not initialized');
+    let retries = 0;
+    while (true) {
+      try {
+        const result = await this.embedModel.embedContent(query);
+        return result.embedding.values;
+      } catch (e: any) {
+        if (e.message?.includes('429') && retries < 3) {
+          await new Promise(r => setTimeout(r, 65000));
+          retries++;
+        } else throw e;
+      }
+    }
+  }
+
+  async hybridSearch(query: string, limit = 3): Promise<CounselingSearchResult[]> {
+    if (!this.initialized || this.chunkCount === 0) return [];
+    try {
+      const denseVector = await this.embedQuery(query);
+      const { indices, values } = this.bm25.transform(query);
+
+      const prefetch: any[] = [{ query: denseVector, using: 'dense', limit: 20 }];
+      if (indices.length > 0) {
+        prefetch.push({ query: { indices, values }, using: 'bm25', limit: 20 });
+      }
+
+      const results = await this.qdrant.query(COUNSELING_COLLECTION, {
+        prefetch,
+        query: { fusion: 'rrf' },
+        limit,
+        with_payload: true
+      });
+
+      return results.points.map(r => {
+        const p = r.payload as any;
+        return {
+          lecture: p.lecture as string,
+          page: p.page as number,
+          text: p.text as string,
+          source: p.source as string,
+          score: r.score
+        };
+      });
+    } catch (e) {
+      console.warn('[Counseling RAG] 검색 실패:', (e as Error).message);
+      return [];
+    }
+  }
+
+  isInitialized(): boolean { return this.initialized; }
+  getChunkCount(): number { return this.chunkCount; }
+}
+
+export const counselingRagService = new CounselingRAGService();

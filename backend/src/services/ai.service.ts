@@ -1,19 +1,45 @@
 import Anthropic from '@anthropic-ai/sdk';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { config } from '../config/env';
-import { ragService } from './rag.service';
+import { ragService, counselingRagService } from './rag.service';
 import { neo4jGraphService } from './neo4j.service';
 import prisma from '../utils/prisma';
 
-// Claude API 클라이언트 초기화
+// Claude API 클라이언트 (현재 미사용 — Gemini로 전환)
 const anthropic = config.CLAUDE_API_KEY && config.CLAUDE_API_KEY !== 'your-claude-api-key-here'
   ? new Anthropic({ apiKey: config.CLAUDE_API_KEY })
   : null;
 
-// Gemini는 임베딩용으로만 유지
+// Gemini — 임베딩 + 텍스트 생성 통합 사용
 const genAI = config.GEMINI_API_KEY && config.GEMINI_API_KEY !== 'your-gemini-api-key-here'
   ? new GoogleGenerativeAI(config.GEMINI_API_KEY)
   : null;
+
+/** Gemini 텍스트 생성 모델 인스턴스 생성 헬퍼 */
+function getGeminiTextModel(systemInstruction: string, maxTokens = 4000) {
+  if (!genAI) return null;
+  return genAI.getGenerativeModel({
+    model: 'gemini-2.5-flash',
+    systemInstruction,
+    generationConfig: {
+      maxOutputTokens: maxTokens,
+      temperature: 0.8,
+      responseMimeType: 'application/json'  // preamble/코드블록 없이 순수 JSON만 반환
+    }
+  });
+}
+
+/** Gemini API 에러 정규화 */
+function normalizeGeminiError(e: any): { status: number; code: string; message: string } {
+  const msg: string = e?.message || String(e);
+  if (msg.includes('API_KEY_INVALID') || msg.includes('PERMISSION_DENIED') || msg.includes('401')) {
+    return { status: 503, code: 'AI_SERVICE_AUTH_ERROR', message: 'AI API 인증에 실패했습니다. GEMINI_API_KEY를 확인해주세요.' };
+  }
+  if (msg.includes('RESOURCE_EXHAUSTED') || msg.includes('429') || msg.includes('quota')) {
+    return { status: 503, code: 'AI_SERVICE_RATE_LIMIT', message: 'AI 서비스 요청 한도를 초과했습니다. 잠시 후 다시 시도해주세요.' };
+  }
+  return { status: 500, code: 'AI_INTERPRETATION_FAILED', message: 'AI 해석에 실패했습니다. 잠시 후 다시 시도해주세요.' };
+}
 
 interface CardInput {
   nameKo: string;
@@ -42,21 +68,29 @@ interface InterpretResponse {
   conclusion: string;  // 최종 결론 및 조언
 }
 
-/** JSON 문자열 값 안의 literal 줄바꿈을 \\n 으로 이스케이프하여 파싱 */
+/** JSON 파싱 — 코드블록 래핑 / preamble 텍스트 / literal 줄바꿈 모두 처리 */
 function safeParseJSON(text: string): InterpretResponse | null {
-  const match = text.match(/\{[\s\S]*\}/);
-  if (!match) return null;
+  // 1단계: ```json ... ``` 코드블록에서 추출 시도
+  const codeBlockMatch = text.match(/```(?:json)?\s*(\{[\s\S]*?\})\s*```/);
+  // 2단계: 코드블록 없으면 첫 { 부터 마지막 } 까지 추출
+  const rawJson = codeBlockMatch ? codeBlockMatch[1] : (() => {
+    const start = text.indexOf('{');
+    const end = text.lastIndexOf('}');
+    return start !== -1 && end > start ? text.slice(start, end + 1) : null;
+  })();
+
+  if (!rawJson) return null;
 
   // 1차 시도: 그대로 파싱
   try {
-    return JSON.parse(match[0]) as InterpretResponse;
+    return JSON.parse(rawJson) as InterpretResponse;
   } catch {
-    // 2차 시도: JSON 문자열 내부의 literal 줄바꿈 이스케이프 후 파싱
+    // 2차 시도: 문자열 내부의 literal 줄바꿈/탭 이스케이프 후 파싱
     try {
       let inString = false;
       let escaped = false;
       let repaired = '';
-      for (const ch of match[0]) {
+      for (const ch of rawJson) {
         if (escaped) { repaired += ch; escaped = false; continue; }
         if (ch === '\\' && inString) { repaired += ch; escaped = true; continue; }
         if (ch === '"') { inString = !inString; repaired += ch; continue; }
@@ -114,29 +148,16 @@ export class AIService {
 }`;
 
   async interpret(request: InterpretRequest): Promise<InterpretResponse> {
-    if (!anthropic) {
-      console.error('[AI Service] Claude API key is not configured');
-      throw {
-        status: 503,
-        code: 'AI_SERVICE_NOT_CONFIGURED',
-        message: 'AI 서비스가 설정되지 않았습니다. .env 파일에 CLAUDE_API_KEY를 설정해주세요.'
-      };
+    const model = getGeminiTextModel(this.systemPrompt, 3000);
+    if (!model) {
+      throw { status: 503, code: 'AI_SERVICE_NOT_CONFIGURED', message: 'AI 서비스가 설정되지 않았습니다. .env 파일에 GEMINI_API_KEY를 설정해주세요.' };
     }
 
     const userPrompt = this.buildUserPrompt(request);
 
     try {
-      const message = await anthropic.messages.create({
-        model: 'claude-haiku-4-5-20251001',  // Haiku 4.5 - 빠르고 비용 효율적
-        max_tokens: 3000,
-        temperature: 0.8,
-        system: this.systemPrompt,
-        messages: [
-          { role: 'user', content: userPrompt }
-        ]
-      });
-
-      const responseText = message.content[0].type === 'text' ? message.content[0].text : '';
+      const result = await model.generateContent(userPrompt);
+      const responseText = result.response.text();
       const parsed = safeParseJSON(responseText);
 
       if (!parsed) {
@@ -146,52 +167,36 @@ export class AIService {
 
       return parsed;
     } catch (error: any) {
-      console.error('[AI Service] Error:', error.message || error);
-
-      // Claude API error handling
-      if (error.status === 401 || error.message?.includes('invalid API key')) {
-        throw { status: 503, code: 'AI_SERVICE_AUTH_ERROR', message: 'AI API 인증에 실패했습니다. API 키를 확인해주세요.' };
-      }
-      if (error.status === 429 || error.message?.includes('rate limit')) {
-        throw { status: 503, code: 'AI_SERVICE_RATE_LIMIT', message: 'AI 서비스 요청 한도를 초과했습니다. 잠시 후 다시 시도해주세요.' };
-      }
+      console.error('[AI Service] Gemini error:', error.message || error);
       if (error.code) throw error;
-      throw { status: 500, code: 'AI_INTERPRETATION_FAILED', message: 'AI 해석에 실패했습니다. 잠시 후 다시 시도해주세요.' };
+      throw normalizeGeminiError(error);
     }
   }
 
   // RAG 컨텍스트 기반 강화 해석 (Qdrant 카드 시맨틱 검색)
   async interpretWithRAG(request: InterpretRequest): Promise<InterpretResponse> {
-    if (!anthropic) {
-      console.error('[AI Service] Claude API key is not configured');
-      throw {
-        status: 503,
-        code: 'AI_SERVICE_NOT_CONFIGURED',
-        message: 'AI 서비스가 설정되지 않았습니다. .env 파일에 CLAUDE_API_KEY를 설정해주세요.'
-      };
+    const model = getGeminiTextModel(this.buildRAGSystemPrompt(), 4000);
+    if (!model) {
+      throw { status: 503, code: 'AI_SERVICE_NOT_CONFIGURED', message: 'AI 서비스가 설정되지 않았습니다. .env 파일에 GEMINI_API_KEY를 설정해주세요.' };
     }
 
-    // 병렬로 RAG + 그래프 컨텍스트 수집 (Inference.py 패턴: 카드+질문 결합 검색)
-    const [ragCardContexts, questionRagCards, graphContext] = await Promise.all([
+    // 병렬로 RAG + 그래프 + 교안 컨텍스트 수집
+    const [ragCardContexts, questionRagCards, graphContext, counselingContext] = await Promise.all([
       this.fetchCardRAGContexts(request.cards, request.question),
       this.fetchQuestionRAGCards(request.question),
-      this.fetchGraphContext(request.cards)
+      this.fetchGraphContext(request.cards),
+      this.fetchCounselingContext(
+        request.question
+          ? `${request.question} ${request.cards.map(c => c.nameKo).join(' ')}`
+          : request.cards.map(c => c.nameKo).join(' ')
+      )
     ]);
 
-    const userPrompt = this.buildRAGUserPrompt(request, ragCardContexts, questionRagCards, graphContext);
+    const userPrompt = this.buildRAGUserPrompt(request, ragCardContexts, questionRagCards, graphContext, counselingContext);
 
     try {
-      const message = await anthropic.messages.create({
-        model: 'claude-haiku-4-5-20251001',  // Haiku 4.5 - 빠르고 비용 효율적
-        max_tokens: 4000,
-        temperature: 0.8,
-        system: this.buildRAGSystemPrompt(),
-        messages: [
-          { role: 'user', content: userPrompt }
-        ]
-      });
-
-      const responseText = message.content[0].type === 'text' ? message.content[0].text : '';
+      const result = await model.generateContent(userPrompt);
+      const responseText = result.response.text();
       const parsed = safeParseJSON(responseText);
 
       if (!parsed) {
@@ -201,17 +206,9 @@ export class AIService {
 
       return parsed;
     } catch (error: any) {
-      console.error('[AI Service] RAG interpret error:', error.message || error);
-
-      // Gemini API error handling
-      if (error.message?.includes('API_KEY_INVALID') || error.message?.includes('invalid API key')) {
-        throw { status: 503, code: 'AI_SERVICE_AUTH_ERROR', message: 'AI API 인증에 실패했습니다. API 키를 확인해주세요.' };
-      }
-      if (error.message?.includes('RATE_LIMIT_EXCEEDED') || error.message?.includes('quota')) {
-        throw { status: 503, code: 'AI_SERVICE_RATE_LIMIT', message: 'AI 서비스 요청 한도를 초과했습니다. 잠시 후 다시 시도해주세요.' };
-      }
+      console.error('[AI Service] Gemini RAG error:', error.message || error);
       if (error.code) throw error;
-      throw { status: 500, code: 'AI_INTERPRETATION_FAILED', message: 'AI 해석에 실패했습니다. 잠시 후 다시 시도해주세요.' };
+      throw normalizeGeminiError(error);
     }
   }
 
@@ -434,28 +431,105 @@ export class AIService {
     return meanings[num] || '특별한 의미';
   }
 
+  // 타로심리상담사 교안 RAG 컨텍스트 조회
+  private async fetchCounselingContext(query: string): Promise<string | null> {
+    if (!counselingRagService.isInitialized()) return null;
+    try {
+      const hits = await counselingRagService.hybridSearch(query, 2);
+      if (hits.length === 0) return null;
+      const lines = hits.map(h =>
+        `[교안: ${h.lecture}]\n${h.text.slice(0, 200)}`
+      );
+      return lines.join('\n\n');
+    } catch (e) {
+      console.warn('[AI] Counseling RAG fetch failed:', e);
+      return null;
+    }
+  }
+
   // 질문을 벡터 검색하여 관련 카드 컨텍스트 조회 (Filtering.py: 시맨틱 검색)
   private async fetchQuestionRAGCards(question?: string): Promise<string | null> {
     if (!question || !ragService.isInitialized()) return null;
 
     try {
-      // 속도 최적화: 3개 → 1개 검색 (프롬프트 크기 67% 감소)
-      const hits = await ragService.hybridSearch(question, 1);
+      const hits = await ragService.hybridSearch(question, 2);
       if (hits.length === 0) {
         console.warn('[RAG] No semantic matches found for question:', question);
         return null;
       }
 
-      // 검색 품질 로그
       console.log(`[RAG] Question search found ${hits.length} cards, top score: ${hits[0].score.toFixed(3)}`);
 
-      // 간소화된 정보만 반환
-      const h = hits[0];
-      return `${h.card.nameKo} (관련도: ${h.score.toFixed(3)})\n키워드: ${h.card.keywords.slice(0, 3).join(', ')}\n의미: ${h.card.uprightMeaning.slice(0, 80)}...`;
+      return hits.map(h =>
+        `${h.card.nameKo} (관련도: ${h.score.toFixed(3)})\n키워드: ${h.card.keywords.slice(0, 4).join(', ')}\n의미: ${h.card.uprightMeaning}`
+      ).join('\n\n');
     } catch (e) {
       console.error('[RAG] Question search failed:', e);
       return null;
     }
+  }
+
+  // 포지션 설명 기반으로 해당 카드가 질문의 어떤 측면에 답해야 하는지 도출
+  private getPositionQuestionAspect(card: CardInput, question: string): string {
+    const desc = (card.positionDescription + ' ' + card.position).toLowerCase();
+
+    if (/과거|이전|원인|근원|배경|뿌리/.test(desc)) {
+      return `"${question}"의 배경과 원인 — 이 상황이 어디서 비롯되었는가?`;
+    }
+    if (/현재|지금|상황|현황|중심|핵심/.test(desc)) {
+      return `"${question}"의 현재 상태 — 지금 이 순간의 에너지와 상황은?`;
+    }
+    if (/미래|결과|앞으로|전망|방향|귀결/.test(desc)) {
+      return `"${question}"의 앞으로의 방향 — 어떻게 전개될 것인가?`;
+    }
+    if (/장애|도전|어려움|방해|교차|크로스/.test(desc)) {
+      return `"${question}"의 주요 장애물 — 무엇이 막고 있는가?`;
+    }
+    if (/조언|행동|해결|방법|접근|권고/.test(desc)) {
+      return `"${question}"에 대한 최선의 행동 — 어떻게 해야 하는가?`;
+    }
+    if (/내면|무의식|감정|마음|내적|희망|두려움/.test(desc)) {
+      return `"${question}"에 대한 내면의 진실 — 마음 깊은 곳의 감정/욕구는?`;
+    }
+    if (/외부|환경|주변|타인|영향|외적/.test(desc)) {
+      return `"${question}"에 영향을 미치는 외부 요인 — 주변 환경과 타인의 역할은?`;
+    }
+    if (/강점|장점|긍정|도움/.test(desc)) {
+      return `"${question}"에서 활용할 수 있는 강점과 유리한 요소는?`;
+    }
+    if (/약점|단점|경고|주의/.test(desc)) {
+      return `"${question}"에서 주의해야 할 위험 요소는?`;
+    }
+
+    return `"${question}"에서 "${card.positionDescription}"의 관점에 직접 답하기`;
+  }
+
+  // 질문 핵심 분석 섹션: 각 카드가 질문의 어떤 측면을 담당하는지 매핑
+  private buildQuestionAnalysisSection(
+    question: string | undefined,
+    cards: CardInput[],
+    domain: string
+  ): string {
+    const q = question ?? '일반적인 삶의 조언';
+    const lines: string[] = [];
+
+    lines.push('━━━ [질문 핵심 분석 — 각 카드가 답해야 할 측면] ━━━');
+    lines.push(`❓ 핵심 질문: "${q}"`);
+    if (domain) lines.push(`📌 질문 영역: ${domain}`);
+    lines.push('');
+    lines.push('📋 카드별 질문 답변 역할 분담:');
+
+    cards.forEach((card, i) => {
+      const aspect = this.getPositionQuestionAspect(card, q);
+      lines.push(`  ${i + 1}. [${card.position}] ${card.nameKo} ${card.isReversed ? '↓역' : '↑정'}`);
+      lines.push(`     → 이 카드가 답해야 할 것: ${aspect}`);
+    });
+
+    lines.push('');
+    lines.push('⚡ 해석 지시: 각 카드는 위 "답해야 할 것"에 직접 답변하는 해석을 제공하세요.');
+    lines.push('   일반적 카드 의미 나열 금지 — 반드시 위 질문 측면에 구체적으로 대입하세요.');
+
+    return lines.join('\n');
   }
 
   private buildRAGSystemPrompt(): string {
@@ -493,6 +567,25 @@ RAG 컨텍스트 활용 원칙:
 2. 질문의 영역(연애·직업·재정·건강 등)을 파악하여 해당 RAG 필드를 우선 참조
 3. 카드 간 그래프 관계(원소 공유, 수비학 연결, 원형 쌍)를 해석에 녹여낼 것
 4. 질문을 항상 중심에 두고, 카드가 '그 질문에 대해' 무엇을 말하는지 각 해석마다 명확히 연결
+
+【★★★ 질문-카드 연결 강화 — 핵심 원칙 ★★★】
+타로 해석의 핵심은 뽑힌 카드가 "사용자의 질문에 어떻게 직접 답하는가"입니다.
+
+❌ 절대 금지 — 이렇게 하면 안 됩니다:
+  × "이 카드는 일반적으로 [의미]를 나타냅니다" — 질문과 무관한 일반적 설명
+  × 카드의 상징만 나열하고 질문 연결 없이 끝내는 것
+  × "참고하시면 좋을 것 같습니다", "도움이 되길 바랍니다" 같은 막연한 마무리
+
+✅ 필수 포함 — 각 cardInterpretation마다 반드시:
+  1. "당신의 질문 '[질문]'에서, 이 카드([포지션명])가 전하는 직접적인 답은..."으로 시작
+  2. "[포지션명]" 위치가 질문의 어떤 측면(원인/현재/미래/장애/조언)을 담당하는지 명시
+  3. 카드의 에너지(정/역방향)가 그 질문 측면에 구체적으로 무엇을 말하는지 연결
+  4. "따라서 [구체적인 결론] — 예: ~할 가능성이 높다/낮다, ~하는 것이 좋다/피해야 한다"
+
+✅ questionAnswer 필드 작성 원칙:
+  1. 모든 카드의 메시지를 종합하여 질문에 대한 "최종 직접 답변" 제시
+  2. "~할 가능성이 높다/낮다", "~하는 것이 좋다" 등 명확한 방향성 포함
+  3. 추상적인 "카드가 말하는..." 대신 "당신의 질문에 대한 답변은..."으로 시작
 
 【멀티 카드 종합 해석 — Retrieve.py 패턴】
 **3장 이상의 카드가 있을 경우 (과거-현재-미래 등):**
@@ -608,7 +701,8 @@ RAG 컨텍스트 활용 원칙:
     request: InterpretRequest,
     ragContexts: Array<{ card: CardInput; ragDoc: string | null }>,
     questionCards: string | null,
-    graphContext: string | null = null
+    graphContext: string | null = null,
+    counselingContext: string | null = null
   ): string {
     const sections: string[] = [];
     const domain = this.detectQuestionDomain(request.question);
@@ -625,7 +719,9 @@ RAG 컨텍스트 활용 원칙:
     sections.push(`스프레드: ${request.spreadType}`);
     if (domain) sections.push(`질문 영역: ${domain} ← RAG 컨텍스트에서 이 영역 정보를 최우선 활용`);
     sections.push('');
-    sections.push('⚠️ 중요: 각 카드 해석마다 반드시 위 질문과 직접 연결하여 해석하세요. 일반적 카드 의미만 나열하지 말 것.');
+
+    // 질문 핵심 분석 섹션 — 각 카드가 질문의 어떤 측면에 답해야 하는지 명시
+    sections.push(this.buildQuestionAnalysisSection(request.question, request.cards, domain));
     sections.push('');
 
     // Inference.py 패턴: [뽑은 카드] + [참고 지식] 섹션
@@ -641,7 +737,12 @@ RAG 컨텍스트 활용 원칙:
         sections.push(ragDoc);
         sections.push('');
       }
-      sections.push(`💬 해석 가이드: 위 [참고 지식]을 바탕으로, 이 카드가 질문 "${request.question ?? '현재 상황'}"에 대해 전하는 메시지를 위치(${card.positionDescription})의 관점에서 상세히 해석하세요.`);
+      const aspect = this.getPositionQuestionAspect(card, request.question ?? '현재 상황에 대한 조언');
+      sections.push(`🎯 [이 카드가 반드시 답해야 할 것]:`);
+      sections.push(`   질문: "${request.question ?? '현재 상황에 대한 조언'}"`);
+      sections.push(`   이 카드(${card.position})의 역할: "${card.positionDescription}"`);
+      sections.push(`   → 답해야 할 측면: ${aspect}`);
+      sections.push(`   → 위 RAG 참고 지식의 ${card.isReversed ? '역방향' : '정방향'} 의미를 위 측면에 직접 대입하여 구체적으로 해석하세요.`);
     });
 
     // Reasoning.py 패턴: 카드 간 '케미' 분석 (메이저 비율, 원소 분포, 수비학 패턴)
@@ -676,6 +777,16 @@ RAG 컨텍스트 활용 원칙:
       sections.push('💡 이 카드들은 질문과 의미적으로 유사하므로 해석의 배경 컨텍스트로 활용하세요.');
     }
 
+    if (counselingContext) {
+      sections.push('');
+      sections.push('╔═══════════════════════════════════════════════════════╗');
+      sections.push('║       [타로심리상담사 교안 — 전문 지식 참고]            ║');
+      sections.push('╚═══════════════════════════════════════════════════════╝');
+      sections.push(counselingContext);
+      sections.push('');
+      sections.push('💡 위 교안 내용은 전문 타로심리상담사 과정의 공식 교재입니다. 해석에 이 전문 지식을 자연스럽게 녹여내세요.');
+    }
+
     sections.push('');
     sections.push('╔═══════════════════════════════════════════════════════╗');
     sections.push('║                  [종합 해석 가이드]                    ║');
@@ -683,6 +794,11 @@ RAG 컨텍스트 활용 원칙:
     sections.push('');
     sections.push('📝 각 카드 해석: 250자 이상으로 풍부하고 생동감 있게 작성');
     sections.push(`💬 질문 연결: "${request.question ?? '현재 상황'}"에 각 카드가 어떻게 답하는지 명확히 연결`);
+    sections.push('');
+    sections.push('🔑 questionAnswer 작성 규칙:');
+    sections.push(`   • 반드시 "당신의 질문 '${request.question ?? '현재 상황'}'에 대해..."로 시작`);
+    sections.push('   • 각 카드가 각자의 포지션에서 전한 메시지를 종합하여 최종 답변 제시');
+    sections.push('   • "~할 가능성이 크다", "~하는 것이 좋다" 등 명확한 방향성 포함');
     sections.push('');
 
     // 멀티 카드 흐름 강조 (Reasoning.py 패턴 강화)
@@ -722,18 +838,16 @@ RAG 컨텍스트 활용 원칙:
 
   // 챗봇 후속 질문 처리
   async chat(request: ChatRequest): Promise<ChatResponse> {
-    if (!anthropic) {
-      throw {
-        status: 503,
-        code: 'AI_SERVICE_NOT_CONFIGURED',
-        message: 'AI 서비스가 설정되지 않았습니다.'
-      };
+    if (!genAI) {
+      throw { status: 503, code: 'AI_SERVICE_NOT_CONFIGURED', message: 'AI 서비스가 설정되지 않았습니다. .env 파일에 GEMINI_API_KEY를 설정해주세요.' };
     }
 
-    // 병렬로 RAG + 그래프 컨텍스트 수집
-    const [questionRagCards, graphContext] = await Promise.all([
+    // 병렬로 RAG + 그래프 + 교안 컨텍스트 수집
+    const chatQuery = `${request.message} ${request.readingContext.cards.map(c => c.nameKo).join(' ')}`;
+    const [questionRagCards, graphContext, counselingContext] = await Promise.all([
       this.fetchQuestionRAGCards(request.message),
-      this.fetchGraphContext(request.readingContext.cards)
+      this.fetchGraphContext(request.readingContext.cards),
+      this.fetchCounselingContext(chatQuery)
     ]);
 
     // 시스템 프롬프트: 리딩 컨텍스트를 알고 있는 타로 상담사
@@ -758,6 +872,9 @@ RAG 컨텍스트 활용 원칙:
     if (questionRagCards) {
       contextLines.push('', '관련 카드 참조:', questionRagCards);
     }
+    if (counselingContext) {
+      contextLines.push('', '=== 타로심리상담사 교안 참고 ===', counselingContext);
+    }
 
     const systemPrompt = `당신은 친근하고 통찰력 있는 타로 상담사입니다.
 현재 진행 중인 타로 리딩의 컨텍스트를 바탕으로 사용자의 후속 질문에 대화체로 답변합니다.
@@ -772,38 +889,28 @@ ${contextLines.join('\n')}
 4. 100-300자 내외로 간결하게 답변
 5. 한국어로 응답`;
 
-    // Claude 대화 형식으로 변환
-    const messages = [
-      ...(request.history ?? []).map(m => ({
-        role: m.role as 'user' | 'assistant',
-        content: m.content
-      })),
-      { role: 'user' as const, content: request.message }
-    ];
+    // Gemini 멀티턴 채팅 (history에서 마지막 user 메시지 제외)
+    const historyMessages = (request.history ?? []).map(m => ({
+      role: (m.role === 'assistant' ? 'model' : 'user') as 'user' | 'model',
+      parts: [{ text: m.content }]
+    }));
 
     try {
-      const message = await anthropic.messages.create({
-        model: 'claude-haiku-4-5-20251001',  // Haiku 4.5 - 빠른 채팅 응답
-        max_tokens: 2000,
-        temperature: 0.8,
-        system: systemPrompt,
-        messages
+      const chatModel = genAI.getGenerativeModel({
+        model: 'gemini-2.5-flash',
+        systemInstruction: systemPrompt,
+        generationConfig: { maxOutputTokens: 2000, temperature: 0.8 }
       });
 
-      const reply = message.content[0].type === 'text' ? message.content[0].text : '';
+      const chat = chatModel.startChat({ history: historyMessages });
+      const result = await chat.sendMessage(request.message);
+      const reply = result.response.text();
       return { reply };
     } catch (error: any) {
-      console.error('[AI Service] Chat error:', error.message || error);
-
-      // Claude error handling
-      if (error.status === 401 || error.message?.includes('invalid API key')) {
-        throw { status: 503, code: 'AI_SERVICE_AUTH_ERROR', message: 'AI API 인증에 실패했습니다.' };
-      }
-      if (error.status === 429 || error.message?.includes('rate limit')) {
-        throw { status: 503, code: 'AI_SERVICE_RATE_LIMIT', message: 'AI 서비스 요청 한도를 초과했습니다.' };
-      }
+      console.error('[AI Service] Gemini chat error:', error.message || error);
       if (error.code) throw error;
-      throw { status: 500, code: 'AI_CHAT_FAILED', message: 'AI 채팅에 실패했습니다.' };
+      const normalized = normalizeGeminiError(error);
+      throw { ...normalized, code: normalized.code === 'AI_INTERPRETATION_FAILED' ? 'AI_CHAT_FAILED' : normalized.code };
     }
   }
 

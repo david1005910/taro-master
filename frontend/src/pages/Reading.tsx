@@ -17,10 +17,8 @@ const Reading = () => {
   const {
     selectedSpread,
     question,
-    interpretMode,
     setSpread,
     setQuestion,
-    setInterpretMode,
     setAvailableCards,
     resetSession
   } = useReadingStore();
@@ -103,50 +101,21 @@ const Reading = () => {
           />
         </motion.div>
 
-        {/* Step 3: Select Interpretation Mode */}
+        {/* Step 3: AI 해석 고정 안내 */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.2 }}
-          className="glass rounded-xl p-6"
+          className="glass rounded-xl p-6 border border-accent/30"
         >
-          <h2 className="text-xl font-semibold text-accent mb-4">
-            3. 해석 모드 선택
-          </h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <button
-              onClick={() => setInterpretMode('TRADITIONAL')}
-              className={`p-4 rounded-xl border-2 transition-all duration-300 text-left ${
-                interpretMode === 'TRADITIONAL'
-                  ? 'border-accent bg-accent/10'
-                  : 'border-mystic-700 hover:border-accent/50'
-              }`}
-            >
-              <div className="flex items-center gap-3 mb-2">
-                <span className="text-2xl">📚</span>
-                <span className="font-semibold text-accent">전통 해석</span>
-              </div>
-              <p className="text-gray-400 text-sm">
-                각 카드의 전통적인 의미를 기반으로 해석을 제공합니다.
-              </p>
-            </button>
-
-            <button
-              onClick={() => setInterpretMode('AI')}
-              className={`p-4 rounded-xl border-2 transition-all duration-300 text-left ${
-                interpretMode === 'AI'
-                  ? 'border-accent bg-accent/10'
-                  : 'border-mystic-700 hover:border-accent/50'
-              }`}
-            >
-              <div className="flex items-center gap-3 mb-2">
-                <span className="text-2xl">🤖</span>
-                <span className="font-semibold text-accent">AI 해석</span>
-              </div>
+          <div className="flex items-center gap-3">
+            <span className="text-2xl">🤖</span>
+            <div>
+              <h2 className="text-lg font-semibold text-accent">AI 해석</h2>
               <p className="text-gray-400 text-sm">
                 AI가 질문과 카드를 분석하여 맞춤형 해석을 제공합니다.
               </p>
-            </button>
+            </div>
           </div>
         </motion.div>
 

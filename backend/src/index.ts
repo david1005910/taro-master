@@ -1,6 +1,6 @@
 import app from './app';
 import { config } from './config/env';
-import { ragService } from './services/rag.service';
+import { ragService, counselingRagService } from './services/rag.service';
 import { neo4jGraphService } from './services/neo4j.service';
 import prisma from './utils/prisma';
 
@@ -46,7 +46,8 @@ app.listen(PORT, async () => {
   console.log(`Server is running on http://localhost:${PORT}`);
   console.log(`Environment: ${config.NODE_ENV}`);
 
-  // RAG + Neo4j 초기화 (백그라운드, 병렬)
+  // RAG + Neo4j + 교안 초기화 (백그라운드, 병렬)
   initializeRAG();
   initializeNeo4j();
+  counselingRagService.initialize();
 });

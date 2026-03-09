@@ -30,7 +30,7 @@ interface ReadingState {
 export const useReadingStore = create<ReadingState>((set, get) => ({
   selectedSpread: null,
   question: '',
-  interpretMode: 'TRADITIONAL',
+  interpretMode: 'AI',
   selectedCards: [],
   availableCards: [],
   isShuffled: false,
@@ -73,7 +73,7 @@ export const useReadingStore = create<ReadingState>((set, get) => ({
     set({
       selectedSpread: null,
       question: '',
-      interpretMode: 'TRADITIONAL',
+      interpretMode: 'AI',
       selectedCards: [],
       availableCards: [],
       isShuffled: false

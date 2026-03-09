@@ -27,6 +27,7 @@
     "lunar-javascript": "^1.7.7",
     "morgan": "^1.10.0",
     "neo4j-driver": "^6.0.1",
+    "pdf-parse": "^1.1.1",
     "voyageai": "^0.1.0",
     "zod": "^3.22.4"
   },
