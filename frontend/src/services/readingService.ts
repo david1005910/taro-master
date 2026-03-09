@@ -3,7 +3,7 @@ import { Reading, ReadingPreview, DailyCardResponse } from '../types';
 
 interface CreateReadingInput {
   spreadId: number;
-  question?: string;
+  question: string;
   interpretMode: 'TRADITIONAL' | 'AI';
   cards: Array<{
     cardId: number;

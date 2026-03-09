@@ -9,7 +9,7 @@ import { z } from 'zod';
 
 const createReadingSchema = z.object({
   spreadId: z.number(),
-  question: z.string().optional(),
+  question: z.string().min(1, '질문을 입력해주세요.'),
   interpretMode: z.enum(['TRADITIONAL', 'AI']),
   cards: z.array(z.object({
     cardId: z.number(),

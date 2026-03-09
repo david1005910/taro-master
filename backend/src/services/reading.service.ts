@@ -3,7 +3,7 @@ import prisma from '../utils/prisma';
 interface CreateReadingInput {
   userId: string;
   spreadId: number;
-  question?: string;
+  question: string;
   interpretMode: string;
   cards: Array<{
     cardId: number;

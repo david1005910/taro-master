@@ -66,7 +66,7 @@ const ReadingSession = () => {
     try {
       const result = await readingService.createReading({
         spreadId: selectedSpread.id,
-        question: question || undefined,
+        question,
         interpretMode,
         cards: selectedCards
       });

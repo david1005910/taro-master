@@ -19,7 +19,7 @@ const genAI = config.GEMINI_API_KEY && config.GEMINI_API_KEY !== 'your-gemini-ap
 function getGeminiTextModel(systemInstruction: string, maxTokens = 4000) {
   if (!genAI) return null;
   return genAI.getGenerativeModel({
-    model: 'gemini-2.5-flash',
+    model: 'gemini-2.5-flash-lite',
     systemInstruction,
     generationConfig: {
       maxOutputTokens: maxTokens,
@@ -68,11 +68,10 @@ interface InterpretResponse {
   conclusion: string;  // 최종 결론 및 조언
 }
 
-/** JSON 파싱 — 코드블록 래핑 / preamble 텍스트 / literal 줄바꿈 모두 처리 */
+/** JSON 파싱 — 코드블록 / preamble / literal줄바꿈 / 잘린 JSON 모두 처리 */
 function safeParseJSON(text: string): InterpretResponse | null {
-  // 1단계: ```json ... ``` 코드블록에서 추출 시도
-  const codeBlockMatch = text.match(/```(?:json)?\s*(\{[\s\S]*?\})\s*```/);
-  // 2단계: 코드블록 없으면 첫 { 부터 마지막 } 까지 추출
+  // 1단계: 코드블록 없는 경우 첫 { 부터 마지막 } 까지 추출 (greedy)
+  const codeBlockMatch = text.match(/```(?:json)?\s*(\{[\s\S]*\})\s*```/);
   const rawJson = codeBlockMatch ? codeBlockMatch[1] : (() => {
     const start = text.indexOf('{');
     const end = text.lastIndexOf('}');
@@ -81,28 +80,58 @@ function safeParseJSON(text: string): InterpretResponse | null {
 
   if (!rawJson) return null;
 
-  // 1차 시도: 그대로 파싱
-  try {
-    return JSON.parse(rawJson) as InterpretResponse;
-  } catch {
-    // 2차 시도: 문자열 내부의 literal 줄바꿈/탭 이스케이프 후 파싱
-    try {
-      let inString = false;
-      let escaped = false;
-      let repaired = '';
-      for (const ch of rawJson) {
-        if (escaped) { repaired += ch; escaped = false; continue; }
-        if (ch === '\\' && inString) { repaired += ch; escaped = true; continue; }
-        if (ch === '"') { inString = !inString; repaired += ch; continue; }
-        if (inString && ch === '\n') { repaired += '\\n'; continue; }
-        if (inString && ch === '\r') { repaired += '\\r'; continue; }
-        if (inString && ch === '\t') { repaired += '\\t'; continue; }
-        repaired += ch;
-      }
-      return JSON.parse(repaired) as InterpretResponse;
-    } catch {
-      return null;
+  // 2단계: literal 줄바꿈/탭 이스케이프 처리
+  function repairJson(src: string): string {
+    let inString = false;
+    let escaped = false;
+    let out = '';
+    for (const ch of src) {
+      if (escaped) { out += ch; escaped = false; continue; }
+      if (ch === '\\' && inString) { out += ch; escaped = true; continue; }
+      if (ch === '"') { inString = !inString; out += ch; continue; }
+      if (inString && ch === '\n') { out += '\\n'; continue; }
+      if (inString && ch === '\r') { out += '\\r'; continue; }
+      if (inString && ch === '\t') { out += '\\t'; continue; }
+      out += ch;
     }
+    return out;
+  }
+
+  // 1차: 그대로 파싱
+  try { return JSON.parse(rawJson) as InterpretResponse; } catch { /* continue */ }
+
+  // 2차: 줄바꿈 repair 후 파싱
+  try { return JSON.parse(repairJson(rawJson)) as InterpretResponse; } catch { /* continue */ }
+
+  // 3차: JSON이 잘린 경우 — 필수 필드만 수동 추출 (정규식 기반)
+  try {
+    const extract = (field: string): string => {
+      const m = rawJson.match(new RegExp(`"${field}"\\s*:\\s*"((?:[^"\\\\]|\\\\.)*)"`));
+      return m ? m[1].replace(/\\n/g, '\n') : '';
+    };
+    const questionAnswer = extract('questionAnswer');
+    const overallInterpretation = extract('overallInterpretation');
+    const conclusion = extract('conclusion');
+
+    // cardInterpretations 배열 추출
+    const cardMatches = [...rawJson.matchAll(/"position"\s*:\s*"([^"]+)"\s*,\s*"interpretation"\s*:\s*"((?:[^"\\]|\\.)*)"/g)];
+    const cardInterpretations = cardMatches.map(m => ({
+      position: m[1],
+      interpretation: m[2].replace(/\\n/g, '\n')
+    }));
+
+    if (questionAnswer || overallInterpretation || cardInterpretations.length > 0) {
+      console.warn('[AI] JSON truncated — recovered via regex fallback');
+      return {
+        questionAnswer: questionAnswer || '카드가 전하는 메시지를 확인해보세요.',
+        overallInterpretation: overallInterpretation || '카드들의 흐름을 통해 답을 찾아보세요.',
+        cardInterpretations,
+        conclusion: conclusion || '카드의 메시지를 마음에 새기고 앞으로 나아가세요.'
+      };
+    }
+    return null;
+  } catch {
+    return null;
   }
 }
 
@@ -175,7 +204,10 @@ export class AIService {
 
   // RAG 컨텍스트 기반 강화 해석 (Qdrant 카드 시맨틱 검색)
   async interpretWithRAG(request: InterpretRequest): Promise<InterpretResponse> {
-    const model = getGeminiTextModel(this.buildRAGSystemPrompt(), 4000);
+    // 카드 수에 따라 토큰 한도 동적 계산 (카드 1장당 ~900토큰 필요)
+    const cardCount = request.cards.length;
+    const maxTokens = Math.min(65000, 2500 + cardCount * 900);
+    const model = getGeminiTextModel(this.buildRAGSystemPrompt(cardCount), maxTokens);
     if (!model) {
       throw { status: 503, code: 'AI_SERVICE_NOT_CONFIGURED', message: 'AI 서비스가 설정되지 않았습니다. .env 파일에 GEMINI_API_KEY를 설정해주세요.' };
     }
@@ -532,7 +564,12 @@ export class AIService {
     return lines.join('\n');
   }
 
-  private buildRAGSystemPrompt(): string {
+  private buildRAGSystemPrompt(cardCount = 3): string {
+    // 카드 수에 따라 per-card 글자 수 조정 (토큰 한도 초과 방지)
+    const perCardChars = cardCount <= 3 ? '420-550자' : cardCount <= 5 ? '300-380자' : '220-280자';
+    const questionAnswerChars = '180-250자';
+    const overallChars = cardCount <= 3 ? '350-450자' : '250-320자';
+
     return `╔═══════════════════════════════════════════════════════════════╗
 ║         당신은 신비롭고 따뜻한 타로 마스터입니다              ║
 ╚═══════════════════════════════════════════════════════════════╝
@@ -632,12 +669,12 @@ RAG 컨텍스트 활용 원칙:
 응답 형식:
 반드시 아래 JSON 형식으로만 응답하세요:
 {
-  "questionAnswer": "질문에 대한 핵심 답변 — RAG 컨텍스트의 해당 영역 의미를 근거로 구체적이고 따뜻하게 (230-310자)",
-  "overallInterpretation": "스프레드 전체의 에너지 흐름 — 케미 분석(메이저/원소/수비학) + 그래프 관계를 녹여 카드들이 하나의 이야기를 만들도록 스토리텔링. position별 흐름(과거→현재→미래) 반드시 명시 (370-500자)",
+  "questionAnswer": "질문에 대한 핵심 답변 — RAG 컨텍스트의 해당 영역 의미를 근거로 구체적이고 따뜻하게 (${questionAnswerChars})",
+  "overallInterpretation": "스프레드 전체의 에너지 흐름 — 케미 분석(메이저/원소/수비학) + 카드들의 스토리텔링. position별 흐름 반드시 명시 (${overallChars})",
   "cardInterpretations": [
-    { "position": "위치명", "interpretation": "① 카드 이미지와 상징을 생생히 묘사 (60-80자) ② 마이너 아르카나라면 이 숫자/인물 단계를 위 비유 방식으로 재미있게 설명 — 예: 컵의 4라면 '물(감정)이 4단계, 네 기둥이 세워진 안정의 시간에 왔어요...' (90-130자) ③ 이 **position(위치)**에서 카드가 전하는 메시지 — 같은 카드도 위치에 따라 의미가 다름! (80-110자) ④ 질문에 어떻게 직접 답하는지 구체적으로 (90-120자) ⑤ 실질적 통찰이나 경고 (70-90자). 총 420-550자" }
+    { "position": "위치명", "interpretation": "① 카드 상징 묘사 ② 마이너라면 숫자 단계 비유 ③ 포지션 메시지 ④ 질문에 직접 답변 ⑤ 실질적 조언. 총 ${perCardChars}" }
   ],
-  "conclusion": "【종합 조언 섹션 — 반드시 아래 5파트 모두 포함, Reasoning.py 패턴】\\n💎 한 줄 요약 조언 (50-70자): 이 리딩의 핵심을 한 문장으로 압축한 행운의 메시지\\n\\n🔮 카드들이 전하는 핵심 메시지 (100-130자): 이 스프레드 전체가 말하는 가장 중요한 한 가지\\n\\n✨ 지금 당장 실천할 행동 조언 3가지 (각 60-80자): 구체적이고 실행 가능한 것들, 번호로 구분\\n\\n⚠️ 주의할 점 (60-90자): 카드가 경고하는 것, 피해야 할 함정\\n\\n💌 마음에 새길 격려 메시지 (90-120자): 따뜻하고 힘이 되는 마무리"
+  "conclusion": "【종합 조언】\\n💎 핵심 요약 (40-60자)\\n\\n✨ 실천 조언 3가지 (각 40-60자)\\n\\n⚠️ 주의사항 (40-60자)\\n\\n💌 격려 메시지 (60-80자)"
 }`;
   }
 
@@ -897,7 +934,7 @@ ${contextLines.join('\n')}
 
     try {
       const chatModel = genAI.getGenerativeModel({
-        model: 'gemini-2.5-flash',
+        model: 'gemini-2.5-flash-lite',
         systemInstruction: systemPrompt,
         generationConfig: { maxOutputTokens: 2000, temperature: 0.8 }
       });

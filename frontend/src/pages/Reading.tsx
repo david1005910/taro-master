@@ -40,7 +40,7 @@ const Reading = () => {
   };
 
   const handleStartReading = async () => {
-    if (!selectedSpread) return;
+    if (!selectedSpread || !question.trim()) return;
 
     try {
       const response = await cardService.getCards({ limit: 78 });
@@ -91,14 +91,17 @@ const Reading = () => {
           className="glass rounded-xl p-6"
         >
           <h2 className="text-xl font-semibold text-accent mb-4">
-            2. 질문 입력 <span className="text-gray-500 text-sm">(선택)</span>
+            2. 질문 입력
           </h2>
           <textarea
             value={question}
             onChange={(e) => setQuestion(e.target.value)}
             placeholder="무엇이 궁금하신가요? 구체적인 질문일수록 더 정확한 해석을 받을 수 있습니다."
-            className="input-mystic min-h-[100px] resize-none"
+            className={`input-mystic min-h-[100px] resize-none ${!question.trim() ? 'border-pink-500/50' : ''}`}
           />
+          {!question.trim() && (
+            <p className="text-pink-400 text-sm mt-2">질문을 입력해야 AI가 정확한 답변을 드릴 수 있습니다.</p>
+          )}
         </motion.div>
 
         {/* Step 3: AI 해석 고정 안내 */}
@@ -128,7 +131,7 @@ const Reading = () => {
         >
           <Button
             onClick={handleStartReading}
-            disabled={!selectedSpread}
+            disabled={!selectedSpread || !question.trim()}
             size="lg"
             className="min-w-[200px]"
           >
@@ -137,6 +140,11 @@ const Reading = () => {
           {!selectedSpread && (
             <p className="text-gray-500 text-sm mt-2">
               스프레드를 선택해주세요
+            </p>
+          )}
+          {selectedSpread && !question.trim() && (
+            <p className="text-pink-400 text-sm mt-2">
+              질문을 입력해주세요
             </p>
           )}
         </motion.div>
