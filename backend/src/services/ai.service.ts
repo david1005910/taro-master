@@ -41,6 +41,25 @@ function normalizeGeminiError(e: any): { status: number; code: string; message: 
   return { status: 500, code: 'AI_INTERPRETATION_FAILED', message: 'AI 해석에 실패했습니다. 잠시 후 다시 시도해주세요.' };
 }
 
+/** 503/일시적 오류 자동 재시도 (최대 3회, 2초 간격) */
+async function withRetry<T>(fn: () => Promise<T>, maxRetries = 3): Promise<T> {
+  let lastError: any;
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      return await fn();
+    } catch (e: any) {
+      lastError = e;
+      const msg: string = e?.message || String(e);
+      const isRetriable = msg.includes('503') || msg.includes('Service Unavailable') ||
+                          msg.includes('overloaded') || msg.includes('temporarily');
+      if (!isRetriable || attempt === maxRetries) throw e;
+      console.warn(`[AI] 일시적 오류 (시도 ${attempt}/${maxRetries}), 2초 후 재시도...`);
+      await new Promise(r => setTimeout(r, 2000 * attempt));
+    }
+  }
+  throw lastError;
+}
+
 interface CardInput {
   nameKo: string;
   nameEn: string;
@@ -185,7 +204,7 @@ export class AIService {
     const userPrompt = this.buildUserPrompt(request);
 
     try {
-      const result = await model.generateContent(userPrompt);
+      const result = await withRetry(() => model.generateContent(userPrompt));
       const responseText = result.response.text();
       const parsed = safeParseJSON(responseText);
 
@@ -227,7 +246,7 @@ export class AIService {
     const userPrompt = this.buildRAGUserPrompt(request, ragCardContexts, questionRagCards, graphContext, counselingContext);
 
     try {
-      const result = await model.generateContent(userPrompt);
+      const result = await withRetry(() => model.generateContent(userPrompt));
       const responseText = result.response.text();
       const parsed = safeParseJSON(responseText);
 
